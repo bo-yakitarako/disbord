@@ -10,6 +10,9 @@
     ".": "./src/index.ts",
     "./lint": "./src/lint/index.ts"
   },
+  "bin": {
+    "disbord": "./src/cli/bin.ts"
+  },
   "scripts": {
     "test": "bun test",
     "lint": "oxlint --fix && oxfmt --write src test",
