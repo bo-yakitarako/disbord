@@ -1,0 +1,33 @@
+{
+  "name": "disbord",
+  "version": "0.0.1",
+  "private": true,
+  "description": "bo-yakitarako専用のオレオレDiscord botフレームワーク",
+  "license": "MIT",
+  "author": "bo-yakitarako",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lint": "./src/lint/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "lint": "oxlint --fix && oxfmt --write src test",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.2",
+    "discord.js": "^14.21.0",
+    "drizzle-orm": "^0.45.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2",
+    "oxfmt": "^0.42.0",
+    "oxlint": "latest",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "typescript": "^7"
+  }
+}
