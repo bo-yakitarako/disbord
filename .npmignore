@@ -1,0 +1,6 @@
+node_modules
+dist
+.disbord
+*.tsbuildinfo
+.DS_Store
+test

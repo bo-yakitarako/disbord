@@ -4,7 +4,7 @@ bo-yakitarako専用のオレオレDiscord botフレームワーク。
 
 ## 現在のスコープ（Phase 1 + Phase 2 完了）
 
-このリポジトリは「コア機構優先で段階実装」として、`disbord.md`記載の2つの配布パッケージ（`disbord` CLI本体・`create-disbord-app`）をすべて実装済み。本モノレポは`disbord`/`create-disbord-app`を明示的なメンバーとするbun workspace（root `package.json`の`workspaces`）として構成しており、生成されるbot側`package.json`は`"disbord": "workspace:*"`を参照する（disbord公開後にバージョン参照へ切り替えるのは将来対応）。
+このリポジトリは「コア機構優先で段階実装」として、`disbord.md`記載の2つの配布パッケージ（`disbord` CLI本体・`create-disbord-app`）をすべて実装済み。開発時は本モノレポを`disbord`/`create-disbord-app`を明示的なメンバーとするbun workspace（root `package.json`の`workspaces`）として使う。生成されるbot側`package.json`はnpm公開を見込んで`"disbord": "^0.0.1"`（`create-disbord-app/src/templates.ts`の`DISBORD_VERSION_RANGE`定数）というバージョン範囲を参照する形にしてある。disbordを新バージョンで公開した際は、この定数を手動で追従させる必要がある。
 
 - `Config` 型（`src/config.ts`）
 - `BotError` / `handleBotError`（`src/BotError.ts`）

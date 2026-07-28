@@ -1,10 +1,10 @@
 {
   "name": "disbord",
   "version": "0.0.1",
-  "private": true,
   "description": "bo-yakitarako専用のオレオレDiscord botフレームワーク",
   "license": "MIT",
   "author": "bo-yakitarako",
+  "repository": "github:bo-yakitarako/disbord",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
