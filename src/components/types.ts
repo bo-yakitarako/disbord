@@ -28,7 +28,6 @@ export type SlashCommandOption = {
   required?: boolean;
 };
 
-// Core無効(TCore = never)なbotではexecuteの第2引数がCoreではなく素の引数になる
 type ExecuteWithCore<TCore, Interaction> = [TCore] extends [never]
   ? (interaction: Interaction, ...args: string[]) => Promise<void>
   : (interaction: Interaction, core: TCore, ...args: string[]) => Promise<void>;

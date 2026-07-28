@@ -49,10 +49,6 @@ async function dispatch(): Promise<number> {
   );
 }
 
-/**
- * CLIツールなのでraw stack traceは出さず、エラーメッセージだけ出してexitする
- * (parseXxxArgsの引数エラーだけでなく、runXxx側の実行時エラーも同様に扱う)。
- */
 async function main() {
   try {
     process.exit(await dispatch());

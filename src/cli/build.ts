@@ -4,9 +4,6 @@ import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { generateMainSource, scanEventFiles } from './generate';
 import { readBotConfig } from './readBotConfig';
 
-/**
- * `disbord build [--external <pkg>]...` の引数解析。`bun build --external`と同じく複数指定可。
- */
 export function parseBuildArgs(args: (string | undefined)[]): { external: string[] } {
   const external: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -34,10 +31,6 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   const dbEnabled = Boolean(config.db?.enable);
   writeFileSync(join(cwd, '.disbord/main.ts'), generateMainSource(eventNames, { origin: 'build', dbEnabled }));
 
-  // @libsql/clientはプラットフォーム別のネイティブバインディング(@libsql/linux-x64-gnu等)を
-  // optionalDependency経由で読み込むため、bun buildで純粋なJSとしてバンドルしきれない
-  // (実機でdist/main.js単体実行時に"Cannot find module '@libsql/linux-x64-gnu'"を確認済み)。
-  // dbEnabled時は常にexternalへ含め、デプロイ先ではnode_modules(@libsql/client)も一緒に必要になる。
   const external = new Set(options.external ?? []);
   if (dbEnabled) {
     external.add('@libsql/client');

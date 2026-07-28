@@ -33,9 +33,6 @@ describe('makeButtonRow (registrationを渡さない糖衣構文)', () => {
     };
     setComponentsState({ buttons, selectMenus: {} });
 
-    // 非augmented環境のフォールバック型(ButtonRegistration<any>)は関数コンポーネントの
-    // 引数タプルまでは厳密に絞り込めないため、実行時挙動の検証としてキャストする
-    // (実際のbotではsrc/disbord.d.tsのmodule augmentation経由でここが厳密に型付けされる)。
     const row = makeButtonRow(['counter', 3] as never);
     const json = row.toJSON() as { components: { custom_id: string; label: string }[] };
     expect(json.components[0]!.label).toBe('カウント3');

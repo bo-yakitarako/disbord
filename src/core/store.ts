@@ -27,8 +27,6 @@ export type CoreStore<T> = {
   remove(interaction: RepliableInteraction): void;
 };
 
-// instanceLevelに応じたキー（guildId/channelId/userId/categoryId/固定文字列）単位でインスタンスを保持する
-
 export function createCoreStore<T>(instanceLevel: InstanceLevel): CoreStore<T> {
   const instances = new Map<string, T>();
   return {

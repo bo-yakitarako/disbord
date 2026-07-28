@@ -8,8 +8,6 @@ import {
   resolveEventParams,
 } from '../src/cli/clientEvents';
 
-// discord.jsの実際の型定義に対してテストする。将来discord.jsが構造を変えて
-// パーサーが壊れたら、このテスト自体が気づかせてくれる。
 const pkgJsonPath = Bun.resolveSync('discord.js/package.json', import.meta.dir);
 const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8')) as { types: string };
 const dtsPath = join(dirname(pkgJsonPath), pkg.types);

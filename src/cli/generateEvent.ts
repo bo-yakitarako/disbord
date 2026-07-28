@@ -20,13 +20,6 @@ function resolveDiscordJsTypingsPath(cwd: string): string {
   return join(dirname(pkgJsonPath), typesRelativePath);
 }
 
-/**
- * src/events/<name>.ts のTSソース全文を組み立てる。
- * messageCreateだけは特別扱いする:
- * - 実際の型(`OmitPartialGroupDMChannel<Message>`)をdiscord.jsから直接importする代わりに、
- *   disbordが再定義した`Message`型(`src/message.ts`)をimportして使う
- * - 自botの発言に反応してループしないよう、`if (message.author.bot) return;`を先頭に入れる
- */
 export function generateEventFileContent(name: string, params: EventParam[], typeIdentifiers: string[]): string {
   if (name === 'messageCreate') {
     return `import type { Message } from 'disbord';

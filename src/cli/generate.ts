@@ -2,11 +2,6 @@ import { readdirSync } from 'node:fs';
 
 const RESERVED_EVENT_NAME = 'interactionCreate';
 
-/**
- * src/events/ を走査してイベント名(拡張子抜きファイル名)一覧を返す。
- * interactionCreateはcomponents層の汎用ルーティングが専有するため、そのファイルが
- * 存在する場合は設定ミスとして即座に気づけるようthrowする。
- */
 export function scanEventFiles(eventsDir: string): string[] {
   const names = readdirSync(eventsDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
@@ -26,41 +21,15 @@ function handlerIdentifier(eventName: string): string {
   return `${eventName}Handler`;
 }
 
-/**
- * client.onの第1引数を組み立てる。discord.jsの`Events`列挙値はほとんどのイベントで
- * ファイル名の文字列と一致するが、`ready`だけは例外(`Events.ClientReady`の実際の値は
- * `'clientReady'`で、`'ready'`は非推奨の別名文字列)。そのため`ready`だけ`Events.ClientReady`を
- * 直接使い、それ以外はファイル名の文字列をそのまま使う。
- */
 function eventBindingTarget(eventName: string): string {
   return eventName === 'ready' ? 'Events.ClientReady' : `'${eventName}'`;
 }
 
 export type GenerateMainSourceOptions = {
-  /**
-   * 生成元コマンドを示すラベル(ヘッダーコメント用途のみ)。挙動には影響しない。
-   */
   origin?: 'dev' | 'build';
-  /**
-   * true: disbord.config.tsのdb.enableがtrueのbot向けに、起動時にcreateDbClient(schema)を呼ぶ配線を含める。
-   * false/未指定(既定): DB関連のimport・呼び出しを一切含めない。
-   * src/db/schema.tsはDB使用bot専用で常に存在するとは限らないため、実行時の分岐ではなく
-   * 生成時点でimportの有無自体を切り替える(bun buildが動的importのリテラルパスも解決を試みるため、
-   * DB未使用botで存在しないファイルを参照するとバンドル失敗する)。
-   */
   dbEnabled?: boolean;
 };
 
-/**
- * .disbord/main.ts のTSソース全文を組み立てる。
- * イベントは静的importで書き出す(bundleでの解決を優先するため)。
- * buttons/selectMenus/slashCommandsは生成時点ではなく実行時に動的importする。
- * slashCommandのREST登録はここでは一切行わない(`disbord commands push`が唯一の登録手段)。
- * coreClass/token等の有効・無効はdisbord.config.tsの中身によって変わるが、
- * それはこのテンプレートが実行時にconfigを読んで分岐するため、
- * ここではeventNames以外の入力を必要としない(config.ts自体の変更はbun --watchが
- * 静的importのグラフ変化として自動検知し再起動する)。
- */
 export function generateMainSource(eventNames: string[], options: GenerateMainSourceOptions = {}): string {
   const origin = options.origin ?? 'dev';
   const dbEnabled = options.dbEnabled ?? false;

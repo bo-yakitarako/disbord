@@ -1,11 +1,6 @@
 const CLIENT_EVENTS_INTERFACE = 'ClientEvents';
 const ALIAS_PATTERN = /^ClientEvents\['(\w+)'\]$/;
 
-/**
- * `[<`と`(`の深さを見ながら、深さ0の位置に現れたseparatorだけで分割する。
- * discord.jsのClientEvents本体はネストしたジェネリクス(`ReadonlyCollection<Snowflake, GuildMember>`等)
- * を含むため、単純な文字列splitではメンバー・タプル要素の境界を誤って割ってしまう。
- */
 function splitTopLevel(text: string, separator: string): string[] {
   const parts: string[] = [];
   let depth = 0;
@@ -45,10 +40,6 @@ function extractInterfaceBody(source: string, interfaceName: string): string {
   return source.slice(bodyStart, i - 1);
 }
 
-/**
- * discord.jsの`.d.ts`本文から`ClientEvents`インターフェースを取り出し、
- * `イベント名 -> 型テキスト`(タプルの生テキスト、または`ClientEvents['xxx']`のような別名参照の生テキスト)のMapを返す。
- */
 export function parseClientEventsInterface(source: string): Map<string, string> {
   const body = extractInterfaceBody(source, CLIENT_EVENTS_INTERFACE);
   const cleaned = stripComments(body);
@@ -68,10 +59,6 @@ export function parseClientEventsInterface(source: string): Map<string, string> 
 
 export type EventParam = { name: string; type: string };
 
-/**
- * 指定イベント名の引数リストを解決する。別名参照(`webhookUpdate: ClientEvents['webhooksUpdate']`)は
- * 再帰的に辿る。イベント名がClientEventsに存在しない場合はthrowする。
- */
 export function resolveEventParams(
   eventName: string,
   members: Map<string, string>,
@@ -107,10 +94,6 @@ export function resolveEventParams(
   });
 }
 
-/**
- * 型テキストの並びから大文字始まりの識別子(discord.jsの型参照の候補)を重複なく集める。
- * discord.js由来かどうかの判定はここでは行わない(isDiscordJsExportの役割)。
- */
 export function collectDiscordJsTypeIdentifiers(paramTypes: string[]): string[] {
   const identifiers = new Set<string>();
   const pattern = /\b[A-Z][A-Za-z0-9_$]*\b/g;
@@ -122,10 +105,6 @@ export function collectDiscordJsTypeIdentifiers(paramTypes: string[]): string[] 
   return [...identifiers];
 }
 
-/**
- * 識別子がdiscord.jsの`.d.ts`本文で「宣言」されているか、「再エクスポートブロック」に含まれているかを判定する。
- * Date/Error等のグローバル組み込み型はどちらにも当たらないためfalseになる。
- */
 export function isDiscordJsExport(source: string, identifier: string): boolean {
   const declPattern = new RegExp(
     `export\\s+(declare\\s+)?(abstract\\s+)?(class|interface|type|enum)\\s+${identifier}\\b`,

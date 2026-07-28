@@ -32,7 +32,6 @@ function buildSelectMenuRow<R extends SelectMenuRegistration<any>, K extends key
   key: K,
   args: ComponentArgs<R[K]['component']>,
 ): ActionRowBuilder<StringSelectMenuBuilder> {
-  // 呼び出し側の型(K extends keyof R)がkeyofRを保証しているため必ず存在する
   const entry = registration[key]!;
   const spec =
     typeof entry.component === 'function'
@@ -43,10 +42,6 @@ function buildSelectMenuRow<R extends SelectMenuRegistration<any>, K extends key
 
 type Registration = RegistryOf<'selectMenus', SelectMenuRegistration<any>>;
 
-/**
- * 呼び出し側はregistrationを渡さず、src/disbord.d.tsのmodule augmentation経由で
- * 自botのselectMenus registrationを暗黙解決する(disbord.md「components配下」節)。
- */
 export function makeSelectMenuRow<K extends keyof Registration>(
   key: K,
   ...args: ComponentArgs<Registration[K]['component']>

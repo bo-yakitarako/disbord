@@ -14,8 +14,6 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
 
-  // dbEnabledはこのdisbord dev起動中は固定(disbord.config.tsのdb.enableを変更した場合は
-  // 手動で再起動が必要)。
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
 
@@ -24,9 +22,6 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   const child = spawnWithDotenvx(cwd, 'development', ['bun', '--watch', '.disbord/main.ts']);
 
-  // src/events/ のファイル増減(=static importの行が変わるケース)だけを検知して再生成する。
-  // 既存イベントファイルの中身編集やdisbord.config.ts/componentsの変更はbun --watch自身が
-  // ロード済みモジュールグラフの変化として検知・再起動するため、ここでは扱わない。
   const watcher = watch(eventsDir, () => {
     let eventNames: string[];
     try {

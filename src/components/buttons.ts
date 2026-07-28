@@ -39,7 +39,6 @@ function buildButtonRow<R extends ButtonRegistration<any>>(
 ): ActionRowBuilder<ButtonBuilder> {
   const buttons = items.map((item) => {
     const [key, ...args] = (Array.isArray(item) ? item : [item]) as [keyof R, ...unknown[]];
-    // 呼び出し側の型(ButtonRowItem<R>)がkeyofRを保証しているため必ず存在する
     const entry = registration[key]!;
     const spec =
       typeof entry.component === 'function'
@@ -52,10 +51,6 @@ function buildButtonRow<R extends ButtonRegistration<any>>(
 
 type Registration = RegistryOf<'buttons', ButtonRegistration<any>>;
 
-/**
- * 呼び出し側はregistrationを渡さず、src/disbord.d.tsのmodule augmentation経由で
- * 自botのbuttons registrationを暗黙解決する(disbord.md「components配下」節)。
- */
 export function makeButtonRow(...items: ButtonRowItem<Registration>[]): ActionRowBuilder<ButtonBuilder> {
   return buildButtonRow(getComponentsState().buttons as Registration, items);
 }

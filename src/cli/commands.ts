@@ -6,10 +6,6 @@ import { spawnWithDotenvx, type EnvTarget } from './dotenvxSpawn';
 
 export type CommandsAction = 'push' | 'delete';
 
-/**
- * `disbord commands push|delete [--env development|production]` の引数解析。
- * 実際のDiscord REST APIを書き換える操作のため、不正な指定は何もspawnせずここでthrowする。
- */
 export function parseCommandsArgs(args: (string | undefined)[]): { action: CommandsAction; envTarget: EnvTarget } {
   const [action, ...rest] = args;
   if (action !== 'push' && action !== 'delete') {
