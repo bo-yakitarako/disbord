@@ -72,7 +72,11 @@ export type EventParam = { name: string; type: string };
  * 指定イベント名の引数リストを解決する。別名参照(`webhookUpdate: ClientEvents['webhooksUpdate']`)は
  * 再帰的に辿る。イベント名がClientEventsに存在しない場合はthrowする。
  */
-export function resolveEventParams(eventName: string, members: Map<string, string>, seen = new Set<string>()): EventParam[] {
+export function resolveEventParams(
+  eventName: string,
+  members: Map<string, string>,
+  seen = new Set<string>(),
+): EventParam[] {
   const type = members.get(eventName);
   if (type === undefined) {
     throw new Error(`disbord: discord.jsに"${eventName}"というイベントは存在しません`);
@@ -123,7 +127,9 @@ export function collectDiscordJsTypeIdentifiers(paramTypes: string[]): string[] 
  * Date/Error等のグローバル組み込み型はどちらにも当たらないためfalseになる。
  */
 export function isDiscordJsExport(source: string, identifier: string): boolean {
-  const declPattern = new RegExp(`export\\s+(declare\\s+)?(abstract\\s+)?(class|interface|type|enum)\\s+${identifier}\\b`);
+  const declPattern = new RegExp(
+    `export\\s+(declare\\s+)?(abstract\\s+)?(class|interface|type|enum)\\s+${identifier}\\b`,
+  );
   if (declPattern.test(source)) return true;
 
   const namedExportBlocks = source.match(/export\s*\{[^}]*\}/g) ?? [];

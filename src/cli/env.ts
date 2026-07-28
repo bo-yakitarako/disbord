@@ -12,7 +12,9 @@ export function parseEnvArgs(args: (string | undefined)[]): { envTarget: EnvTarg
     if (args[i] === '--env') {
       const value = args[i + 1];
       if (value !== 'development' && value !== 'production') {
-        throw new Error(`disbord: --envは"development"か"production"を指定してください（指定値: ${value ?? '(なし)'}）`);
+        throw new Error(
+          `disbord: --envは"development"か"production"を指定してください（指定値: ${value ?? '(なし)'}）`,
+        );
       }
       envTarget = value;
       i++;

@@ -24,3 +24,4 @@ export type {
   SlashCommandRegistration,
 } from './components/types';
 export type { Registry, RegistryOf } from './registry';
+export type { Message } from './message';

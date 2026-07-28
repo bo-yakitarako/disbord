@@ -10,8 +10,14 @@ export const config = {
     'no-shadow': 'off',
     'no-use-before-define': 'off',
     'class-methods-use-this': 'off',
+    // 相対import(./や../)を禁止し@/絶対パスimportを必須にする。
+    // "./*"のような1階層のみのglobだと"../../foo"のようなネストを見逃すため"**"を使う。
+    // disbord自身は@/エイリアスを持たず相対importで書かれているため、disbord/oxlint.config.tsで
+    // このルールだけ'off'に上書きしている。
+    'no-restricted-imports': ['error', { patterns: ['./**', '../**'] }],
   },
   env: {
     builtin: true,
   },
+  ignorePatterns: ['.disbord/*'],
 };

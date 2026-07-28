@@ -32,10 +32,7 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
-  writeFileSync(
-    join(cwd, '.disbord/main.ts'),
-    generateMainSource(eventNames, { registerCommands: false, dbEnabled }),
-  );
+  writeFileSync(join(cwd, '.disbord/main.ts'), generateMainSource(eventNames, { origin: 'build', dbEnabled }));
 
   // @libsql/clientはプラットフォーム別のネイティブバインディング(@libsql/linux-x64-gnu等)を
   // optionalDependency経由で読み込むため、bun buildで純粋なJSとしてバンドルしきれない
