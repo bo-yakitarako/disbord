@@ -2,6 +2,7 @@ import { mkdirSync, watch, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnWithDotenvx } from './dotenvxSpawn';
 import { generateMainSource, scanEventFiles } from './generate';
+import { readBotConfig } from './readBotConfig';
 
 function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
@@ -13,8 +14,13 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
 
+  // dbEnabledはこのdisbord dev起動中は固定(disbord.config.tsのdb.enableを変更した場合は
+  // 手動で再起動が必要。generateMainSourceのregisterCommandsと同じ扱い)。
+  const config = await readBotConfig(cwd);
+  const dbEnabled = Boolean(config.db?.enable);
+
   let lastEventNames = scanEventFiles(eventsDir);
-  writeFileSync(mainPath, generateMainSource(lastEventNames));
+  writeFileSync(mainPath, generateMainSource(lastEventNames, { dbEnabled }));
 
   const child = spawnWithDotenvx(cwd, 'development', ['bun', '--watch', '.disbord/main.ts']);
 
@@ -31,7 +37,7 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
     }
     if (arraysEqual(eventNames, lastEventNames)) return;
     lastEventNames = eventNames;
-    writeFileSync(mainPath, generateMainSource(eventNames));
+    writeFileSync(mainPath, generateMainSource(eventNames, { dbEnabled }));
     console.log('disbord: src/events/ の構成が変わったため .disbord/main.ts を再生成しました');
   });
 

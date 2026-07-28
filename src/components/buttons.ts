@@ -5,8 +5,10 @@ import {
   type ButtonInteraction as DiscordButtonInteraction,
 } from 'discord.js';
 import type { CoreStore } from '../core/store';
+import type { RegistryOf } from '../registry';
 import { buildCustomId, parseCustomId } from './customId';
 import { wrapButtonInteraction } from './interaction';
+import { getComponentsState } from './state';
 import type { ButtonComponent, ButtonRegistration, ButtonStyleName } from './types';
 
 const buttonStyleMap: Record<ButtonStyleName, ButtonStyle> = {
@@ -31,9 +33,9 @@ type ButtonRowItem<R extends ButtonRegistration<any>> = {
   [K in keyof R]: R[K]['component'] extends (...args: infer P) => ButtonComponent ? [K, ...P] : K;
 }[keyof R];
 
-export function makeButtonRow<R extends ButtonRegistration<any>>(
+function buildButtonRow<R extends ButtonRegistration<any>>(
   registration: R,
-  ...items: ButtonRowItem<R>[]
+  items: ButtonRowItem<R>[],
 ): ActionRowBuilder<ButtonBuilder> {
   const buttons = items.map((item) => {
     const [key, ...args] = (Array.isArray(item) ? item : [item]) as [keyof R, ...unknown[]];
@@ -46,6 +48,16 @@ export function makeButtonRow<R extends ButtonRegistration<any>>(
     return buildButtonComponent(key as string, spec);
   });
   return new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
+}
+
+type Registration = RegistryOf<'buttons', ButtonRegistration<any>>;
+
+/**
+ * 呼び出し側はregistrationを渡さず、src/disbord.d.tsのmodule augmentation経由で
+ * 自botのbuttons registrationを暗黙解決する(disbord.md「components配下」節)。
+ */
+export function makeButtonRow(...items: ButtonRowItem<Registration>[]): ActionRowBuilder<ButtonBuilder> {
+  return buildButtonRow(getComponentsState().buttons as Registration, items);
 }
 
 type CoreOption<TCore> = { store: CoreStore<TCore>; nullMessage: string };

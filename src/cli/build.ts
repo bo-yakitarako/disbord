@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { generateMainSource, scanEventFiles } from './generate';
+import { readBotConfig } from './readBotConfig';
 
 /**
  * `disbord build [--external <pkg>]...` の引数解析。`bun build --external`と同じく複数指定可。
@@ -28,14 +29,29 @@ export function parseBuildArgs(args: (string | undefined)[]): { external: string
 export async function runBuild(cwd: string, options: { external?: string[] } = {}): Promise<void> {
   const eventNames = scanEventFiles(join(cwd, 'src/events'));
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
-  writeFileSync(join(cwd, '.disbord/main.ts'), generateMainSource(eventNames, { registerCommands: false }));
+
+  const config = await readBotConfig(cwd);
+  const dbEnabled = Boolean(config.db?.enable);
+  writeFileSync(
+    join(cwd, '.disbord/main.ts'),
+    generateMainSource(eventNames, { registerCommands: false, dbEnabled }),
+  );
+
+  // @libsql/clientはプラットフォーム別のネイティブバインディング(@libsql/linux-x64-gnu等)を
+  // optionalDependency経由で読み込むため、bun buildで純粋なJSとしてバンドルしきれない
+  // (実機でdist/main.js単体実行時に"Cannot find module '@libsql/linux-x64-gnu'"を確認済み)。
+  // dbEnabled時は常にexternalへ含め、デプロイ先ではnode_modules(@libsql/client)も一緒に必要になる。
+  const external = new Set(options.external ?? []);
+  if (dbEnabled) {
+    external.add('@libsql/client');
+  }
 
   const result = await Bun.build({
     entrypoints: [join(cwd, '.disbord/main.ts')],
     outdir: join(cwd, 'dist'),
     target: 'bun',
     minify: true,
-    external: options.external ?? [],
+    external: [...external],
   });
   if (!result.success) {
     for (const log of result.logs) {

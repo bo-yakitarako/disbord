@@ -43,6 +43,25 @@ describe('generateMainSource', () => {
     expect(source.indexOf('rest.put')).toBeLessThan(source.indexOf('client.login'));
   });
 
+  test('setComponentsStateはcomponentsの動的import直後・Client生成より前に呼ばれる', () => {
+    const source = generateMainSource([]);
+    expect(source).toContain('setComponentsState({ buttons, selectMenus });');
+    const importsIdx = source.indexOf(`await import('../src/components/slashCommands')`);
+    const setStateIdx = source.indexOf('setComponentsState(');
+    const clientIdx = source.indexOf('new Client(');
+    expect(importsIdx).toBeLessThan(setStateIdx);
+    expect(setStateIdx).toBeLessThan(clientIdx);
+  });
+
+  test('setComponentsStateはregisterCommands/dbEnabledの組み合わせによらず常に含まれる', () => {
+    for (const registerCommands of [true, false]) {
+      for (const dbEnabled of [true, false]) {
+        const source = generateMainSource([], { registerCommands, dbEnabled });
+        expect(source).toContain('setComponentsState({ buttons, selectMenus });');
+      }
+    }
+  });
+
   test('coreOptionはbutton/selectMenuルーティングにのみ渡り、slashCommandには渡らない', () => {
     const source = generateMainSource([]);
     expect(source).toContain('routeButtonInteraction(interaction, buttons, coreOption as never)');
@@ -88,5 +107,34 @@ describe('generateMainSource', () => {
     const source = generateMainSource([], { registerCommands: false });
     expect(source).toContain(`await import('../src/components/slashCommands')`);
     expect(source).toContain('routeSlashCommandInteraction(interaction, slashCommands)');
+  });
+
+  test('dbEnabled省略時はfalse相当(DB関連コードを一切含まない)', () => {
+    const source = generateMainSource([]);
+    expect(source).not.toContain('createDbClient');
+    expect(source).not.toContain('db/schema');
+  });
+
+  test('dbEnabled: trueはschema importとcreateDbClient呼び出しを含む', () => {
+    const source = generateMainSource([], { dbEnabled: true });
+    expect(source).toContain('createDbClient');
+    expect(source).toContain(`import { schema } from '../src/db/schema';`);
+    expect(source).toContain('createDbClient(schema);');
+  });
+
+  test('dbEnabled: trueのcreateDbClient呼び出しはclient生成より前', () => {
+    const source = generateMainSource([], { dbEnabled: true });
+    expect(source.indexOf('createDbClient(schema)')).toBeLessThan(source.indexOf('new Client('));
+  });
+
+  test('dbEnabled: falseはschema importを含まない', () => {
+    const source = generateMainSource([], { dbEnabled: false });
+    expect(source).not.toContain('db/schema');
+  });
+
+  test('registerCommands・dbEnabledは独立に組み合わせられる(build用: false/true)', () => {
+    const source = generateMainSource([], { registerCommands: false, dbEnabled: true });
+    expect(source).not.toContain('rest.put');
+    expect(source).toContain('createDbClient(schema);');
   });
 });

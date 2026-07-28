@@ -32,6 +32,14 @@ export type GenerateMainSourceOptions = {
    * false(build): 登録しない(disbord.md「ビルド」節の設計。必要ならdisbord commands pushを別途手動実行する)。
    */
   registerCommands?: boolean;
+  /**
+   * true: disbord.config.tsのdb.enableがtrueのbot向けに、起動時にcreateDbClient(schema)を呼ぶ配線を含める。
+   * false/未指定(既定): DB関連のimport・呼び出しを一切含めない。
+   * src/db/schema.tsはDB使用bot専用で常に存在するとは限らないため、実行時の分岐ではなく
+   * 生成時点でimportの有無自体を切り替える(bun buildが動的importのリテラルパスも解決を試みるため、
+   * DB未使用botで存在しないファイルを参照するとバンドル失敗する)。
+   */
+  dbEnabled?: boolean;
 };
 
 /**
@@ -45,6 +53,7 @@ export type GenerateMainSourceOptions = {
  */
 export function generateMainSource(eventNames: string[], options: GenerateMainSourceOptions = {}): string {
   const registerCommands = options.registerCommands ?? true;
+  const dbEnabled = options.dbEnabled ?? false;
 
   const eventImports = eventNames
     .map((name) => `import ${handlerIdentifier(name)} from '../src/events/${name}';`)
@@ -60,8 +69,12 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
     'routeButtonInteraction',
     'routeSelectMenuInteraction',
     'routeSlashCommandInteraction',
+    'setComponentsState',
     ...(registerCommands ? ['collectSlashCommandsData'] : []),
+    ...(dbEnabled ? ['createDbClient'] : []),
   ];
+  const schemaImport = dbEnabled ? `\nimport { schema } from '../src/db/schema';` : '';
+  const dbInit = dbEnabled ? `  createDbClient(schema);\n\n` : '';
   const loginBlock = registerCommands
     ? `  const TOKEN = process.env[config.token ?? 'TOKEN'];
   const CLIENT_ID = process.env[config.clientId ?? 'CLIENT_ID'];
@@ -81,13 +94,14 @@ ${discordImports}
 import {
   ${disbordImports.join(',\n  ')},
 } from 'disbord';
-import config from '../disbord.config';
+import config from '../disbord.config';${schemaImport}
 ${eventImports}
 
 async function main() {
-  const buttons = (await import('../src/components/buttons')).default;
+${dbInit}  const buttons = (await import('../src/components/buttons')).default;
   const selectMenus = (await import('../src/components/selectMenus')).default;
   const slashCommands = (await import('../src/components/slashCommands')).default;
+  setComponentsState({ buttons, selectMenus });
 
   const client = new Client({ intents: config.intents });
 

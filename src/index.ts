@@ -11,6 +11,7 @@ export {
   type StringSelectMenuInteraction,
 } from './components/interaction';
 export { makeSelectMenuRow, routeSelectMenuInteraction } from './components/selectMenus';
+export { setComponentsState } from './components/state';
 export { collectSlashCommandsData, routeSlashCommandInteraction } from './components/slashCommands';
 export type {
   ButtonComponent,
