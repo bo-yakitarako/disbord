@@ -8,68 +8,58 @@ import { runGenerateEvent } from './generateEvent';
 const IMPLEMENTED_COMMANDS = ['dev', 'build', 'commands push', 'commands delete', 'env', 'generate event'];
 
 // oxlint-disable-next-line complexity
-async function main() {
+async function dispatch(): Promise<number> {
   const [command, sub, ...rest] = Bun.argv.slice(2);
 
   if (command === 'dev') {
     await runDev();
-    return;
+    return 0;
   }
 
   if (command === 'build') {
-    let external: ReturnType<typeof parseBuildArgs>['external'];
-    try {
-      ({ external } = parseBuildArgs([sub, ...rest]));
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
+    const { external } = parseBuildArgs([sub, ...rest]);
     await runBuild(process.cwd(), { external });
-    return;
+    return 0;
   }
 
   if (command === 'commands') {
-    let action: ReturnType<typeof parseCommandsArgs>['action'];
-    let envTarget: ReturnType<typeof parseCommandsArgs>['envTarget'];
-    try {
-      ({ action, envTarget } = parseCommandsArgs([sub, ...rest]));
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
-    const exitCode = await runCommands(action, envTarget, process.cwd());
-    process.exit(exitCode);
+    const { action, envTarget } = parseCommandsArgs([sub, ...rest]);
+    return runCommands(action, envTarget, process.cwd());
   }
 
   if (command === 'env') {
-    let envTarget: ReturnType<typeof parseEnvArgs>['envTarget'];
-    try {
-      ({ envTarget } = parseEnvArgs([sub, ...rest]));
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : error);
-      process.exit(1);
-    }
-    const exitCode = await runEnvToggle(envTarget, process.cwd());
-    process.exit(exitCode);
+    const { envTarget } = parseEnvArgs([sub, ...rest]);
+    return runEnvToggle(envTarget, process.cwd());
   }
 
   if (command === 'generate') {
     if (sub !== 'event' || !rest[0]) {
-      console.error('disbord: 使い方: disbord generate event <name>');
-      process.exit(1);
+      throw new Error('disbord: 使い方: disbord generate event <name>');
     }
     await runGenerateEvent(rest[0], process.cwd());
-    return;
+    return 0;
   }
 
   const known = ['dev', 'build', 'env', 'commands push', 'commands delete', 'generate event'];
   const label = command ?? '(no command)';
-  console.error(
+  throw new Error(
     `disbord: unknown or not-yet-implemented command "${label}".\n` +
       `実装済み: ${IMPLEMENTED_COMMANDS.join(', ')}\n` +
       `未実装（Phase 2で順次対応予定）: ${known.filter((c) => !IMPLEMENTED_COMMANDS.includes(c)).join(', ')}`,
   );
-  process.exit(1);
+}
+
+/**
+ * CLIツールなのでraw stack traceは出さず、エラーメッセージだけ出してexitする
+ * (parseXxxArgsの引数エラーだけでなく、runXxx側の実行時エラーも同様に扱う)。
+ */
+async function main() {
+  try {
+    process.exit(await dispatch());
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
 }
 
 void main();
