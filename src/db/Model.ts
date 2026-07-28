@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { and, eq, getTableColumns } from 'drizzle-orm';
 import { getDbState } from './state';
 
@@ -52,11 +53,11 @@ export abstract class Model<T extends Document = Document> {
   }
 
   public get createdAt() {
-    return this._data.createdAt;
+    return dayjs(this._data.createdAt);
   }
 
   public get updatedAt() {
-    return this._data.updatedAt;
+    return dayjs(this._data.updatedAt);
   }
 
   public static get tableName(): string {

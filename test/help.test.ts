@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { buildHelpText } from '../src/cli/help';
 
 describe('buildHelpText', () => {
-  test('dbEnabled: trueならmigrateを含め、DB非依存の全コマンドも含む', () => {
+  test('dbEnabled: trueならmigrate/generate modelを含め、DB非依存の全コマンドも含む', () => {
     const text = buildHelpText({ dbEnabled: true });
     for (const usage of [
       'disbord dev',
@@ -11,20 +11,25 @@ describe('buildHelpText', () => {
       'disbord commands delete',
       'disbord env',
       'disbord generate event <name>',
+      'disbord generate model <Name>',
       'disbord migrate',
     ]) {
       expect(text).toContain(usage);
     }
   });
 
-  test('dbEnabled: falseならmigrateを含まない', () => {
+  test('dbEnabled: falseならmigrate/generate modelを含まない', () => {
     const text = buildHelpText({ dbEnabled: false });
     expect(text).not.toContain('disbord migrate');
+    expect(text).not.toContain('disbord generate model');
     expect(text).toContain('disbord dev');
+    expect(text).toContain('disbord generate event <name>');
   });
 
-  test('dbEnabled省略時はfalse相当(migrateを含まない)', () => {
-    expect(buildHelpText()).not.toContain('disbord migrate');
+  test('dbEnabled省略時はfalse相当(migrate/generate modelを含まない)', () => {
+    const text = buildHelpText();
+    expect(text).not.toContain('disbord migrate');
+    expect(text).not.toContain('disbord generate model');
   });
 
   test('--version/-vと--help/-hの説明を含む', () => {

@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import dayjs, { type Dayjs } from 'dayjs';
+import { Model } from '../src/db/Model';
 import {
   Column,
   CompoundIndex,
@@ -12,29 +14,42 @@ import {
 } from '../src/db/decorators';
 
 @Table('users')
-class User {
+class User extends Model<User.Data> {
   @Unique()
   @Column('text')
-  static accessor email: string;
+  accessor email!: string;
 
   @Column('text')
-  static accessor name: string;
+  accessor name!: string;
+}
+
+namespace User {
+  export type Data = { email: string; name: string };
 }
 
 @Table('jobs')
 @CompoundIndex(['userId', 'name'])
-class Job {
+class Job extends Model<Job.Data> {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
-  static accessor userId: string;
+  accessor userId!: string;
 
   @Index()
   @Column('integer', { mode: 'timestamp_ms' })
-  static accessor createdAt: Date;
+  accessor scheduledAt!: Dayjs;
 
   @PrimaryKey()
   @Column('text')
-  static accessor slug: string;
+  accessor slug!: string;
+
+  @Column('text')
+  accessor name!: string;
 }
+
+namespace Job {
+  export type Data = { userId: string; scheduledAt: Date; slug: string; name: string };
+}
+
+const now = new Date();
 
 describe('decorators', () => {
   test('@Tableがクラスに_tableNameを設定する', () => {
@@ -62,7 +77,7 @@ describe('decorators', () => {
 
   test('@Indexは単一カラムのindexesに登録される', () => {
     const meta = readModelMeta(Job as unknown as ModelClass);
-    expect(meta.indexes.some((i) => i.properties.length === 1 && i.properties[0] === 'createdAt')).toBe(true);
+    expect(meta.indexes.some((i) => i.properties.length === 1 && i.properties[0] === 'scheduledAt')).toBe(true);
   });
 
   test('@CompoundIndexはクラスデコレータとして複数カラムのindexesに登録される', () => {
@@ -80,5 +95,33 @@ describe('decorators', () => {
   test('@Tableが付いていないクラスをreadModelMetaに渡すとthrow', () => {
     class Untagged {}
     expect(() => readModelMeta(Untagged as unknown as ModelClass)).toThrow(/@Table/);
+  });
+
+  test('@Column/@Relateが付与したaccessorは実際にthis._dataを読み取る(staticではなくinstanceだから可能)', () => {
+    const user = new User({ id: 'u1', createdAt: now, updatedAt: now, email: 'a@example.com', name: 'Taro' });
+    expect(user.email).toBe('a@example.com');
+
+    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    expect(job.userId).toBe('u1');
+  });
+
+  test('直接代入は読み取り専用エラーでthrowする(値の変更はModelのset()/update()経由に統一するため)', () => {
+    const user = new User({ id: 'u1', createdAt: now, updatedAt: now, email: 'a@example.com', name: 'Taro' });
+    expect(() => {
+      user.email = 'b@example.com';
+    }).toThrow(/読み取り専用/);
+    expect(user.email).toBe('a@example.com');
+  });
+
+  test('mode: timestamp_msのカラムはgetter越しにdayjsでラップされる', () => {
+    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    expect(dayjs.isDayjs(job.scheduledAt)).toBe(true);
+    expect(job.scheduledAt.valueOf()).toBe(now.valueOf());
+  });
+
+  test('Model本体のcreatedAt/updatedAtもdayjsでラップされる', () => {
+    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    expect(dayjs.isDayjs(job.createdAt)).toBe(true);
+    expect(dayjs.isDayjs(job.updatedAt)).toBe(true);
   });
 });

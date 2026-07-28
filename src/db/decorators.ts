@@ -1,3 +1,5 @@
+import dayjs from 'dayjs';
+
 export type ModelClass = (abstract new (...args: any[]) => unknown) & { tableName: string };
 
 export type ColumnType = 'text' | 'integer' | 'real';
@@ -47,14 +49,27 @@ function push<T>(metadata: MetadataBag, key: symbol, entry: T): void {
   list.push(entry);
 }
 
+function dataGetter(property: string, options: { dayjs?: boolean } = {}): { get(this: any): any; set(this: any): void } {
+  return {
+    get(this: any) {
+      const value = this._data[property];
+      return options.dayjs && value != null ? dayjs(value) : value;
+    },
+    set(this: any) {
+      throw new Error(`disbord: ${property} は読み取り専用です。値を変更するには Model の set()/update() を使ってください`);
+    },
+  };
+}
+
 export function Column(type: ColumnType, options: ColumnOptions = {}) {
-  return function (_target: unknown, context: ClassAccessorDecoratorContext): void {
+  return function (_target: unknown, context: ClassAccessorDecoratorContext) {
     const metadata = context.metadata as MetadataBag;
     const property = String(context.name);
     push<ColumnMeta>(metadata, COLUMNS, { property, type, options });
     if (options.unique) {
       push<MarkerMeta>(metadata, UNIQUES, { properties: [property] });
     }
+    return dataGetter(property, { dayjs: options.mode === 'timestamp_ms' });
   };
 }
 
@@ -89,8 +104,10 @@ export function CompoundIndex(properties: string[], name?: string) {
 }
 
 export function Relate(target: () => ModelClass, options: RelateOptions = {}) {
-  return function (_target: unknown, context: ClassAccessorDecoratorContext): void {
-    push<RelateMeta>(context.metadata as MetadataBag, RELATES, { property: String(context.name), target, options });
+  return function (_target: unknown, context: ClassAccessorDecoratorContext) {
+    const property = String(context.name);
+    push<RelateMeta>(context.metadata as MetadataBag, RELATES, { property, target, options });
+    return dataGetter(property);
   };
 }
 

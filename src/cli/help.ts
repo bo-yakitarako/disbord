@@ -8,6 +8,11 @@ const COMMANDS: CommandHelp[] = [
   { usage: 'disbord env [--env development|production]', description: 'env/配下の環境変数を暗号化⇔復号にtoggleする' },
   { usage: 'disbord generate event <name>', description: 'イベントハンドラを追加生成する' },
   {
+    usage: 'disbord generate model <Name>',
+    description: 'src/db/models/にdecorator付きのモデルクラスを追加生成する',
+    requiresDb: true,
+  },
+  {
     usage: 'disbord migrate [--production]',
     description: 'モデル定義からschema.ts・migrationファイルを生成し、DBに適用する',
     requiresDb: true,

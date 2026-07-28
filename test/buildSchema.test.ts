@@ -1,43 +1,57 @@
 import { describe, expect, test } from 'bun:test';
+import type { Dayjs } from 'dayjs';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { createTableRelationsHelpers, Many, One } from 'drizzle-orm';
 import { buildSchema } from '../src/db/buildSchema';
 import { Column, CompoundIndex, Index, Relate, Table, Unique, type ModelClass } from '../src/db/decorators';
+import { Model } from '../src/db/Model';
 
 @Table('users')
-class User {
+class User extends Model<User.Data> {
   @Unique()
   @Column('text')
-  static accessor email: string;
+  accessor email!: string;
 
   @Column('text')
-  static accessor name: string;
+  accessor name!: string;
+}
+
+namespace User {
+  export type Data = { email: string; name: string };
 }
 
 @Table('jobs')
-class Job {
+class Job extends Model<Job.Data> {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
-  static accessor userId: string;
+  accessor userId!: string;
 
   @Column('text')
-  static accessor name: string;
+  accessor name!: string;
+}
+
+namespace Job {
+  export type Data = { userId: string; name: string };
 }
 
 @Table('workTimes')
 @CompoundIndex(['userId', 'jobId'])
-class WorkTime {
+class WorkTime extends Model<WorkTime.Data> {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
-  static accessor userId: string;
+  accessor userId!: string;
 
   @Relate(() => Job as unknown as ModelClass, { onDelete: 'set null', nullable: true })
-  static accessor jobId: string;
+  accessor jobId!: string;
 
   @Index()
   @Column('integer', { mode: 'timestamp_ms' })
-  static accessor actedAt: Date;
+  accessor actedAt!: Dayjs;
 
   @Column('text', { enum: ['working', 'resting', 'workOff'] })
-  static accessor status: string;
+  accessor status!: string;
+}
+
+namespace WorkTime {
+  export type Data = { userId: string; jobId: string; actedAt: Date; status: string };
 }
 
 const models = [User, Job, WorkTime] as unknown as ModelClass[];

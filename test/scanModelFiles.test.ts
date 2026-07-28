@@ -32,7 +32,7 @@ describe('scanModelFiles', () => {
       join(modelsDir, 'User.ts'),
       `import { Table, Column } from '${join(import.meta.dir, '..', 'src/index.ts')}';\n\n` +
         `export const notAModel = 'plain export';\n\n` +
-        `@Table('users')\nexport class User {\n  @Column('text')\n  static accessor email: string;\n}\n`,
+        `@Table('users')\nexport class User {\n  @Column('text')\n  accessor email!: string;\n}\n`,
     );
 
     const models = await scanModelFiles(modelsDir);

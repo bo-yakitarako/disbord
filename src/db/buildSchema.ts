@@ -10,7 +10,7 @@ import {
 
 export type { ModelClass } from './decorators';
 
-function toSnakeCase(property: string): string {
+export function toSnakeCase(property: string): string {
   return property.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 }
 

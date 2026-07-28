@@ -4,6 +4,7 @@ import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
 import { parseEnvArgs, runEnvToggle } from './env';
 import { runGenerateEvent } from './generateEvent';
+import { runGenerateModel } from './generateModel';
 import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
 import { readBotConfig } from './readBotConfig';
@@ -25,6 +26,7 @@ const IMPLEMENTED_COMMANDS = [
   'commands delete',
   'env',
   'generate event',
+  'generate model',
   'migrate',
 ];
 
@@ -65,11 +67,15 @@ async function dispatch(): Promise<number> {
   }
 
   if (command === 'generate') {
-    if (sub !== 'event' || !rest[0]) {
-      throw new Error('disbord: 使い方: disbord generate event <name>');
+    if (sub === 'event' && rest[0]) {
+      await runGenerateEvent(rest[0], process.cwd());
+      return 0;
     }
-    await runGenerateEvent(rest[0], process.cwd());
-    return 0;
+    if (sub === 'model' && rest[0]) {
+      await runGenerateModel(rest[0], process.cwd());
+      return 0;
+    }
+    throw new Error('disbord: 使い方: disbord generate event <name> | disbord generate model <Name>');
   }
 
   if (command === 'migrate') {
@@ -77,7 +83,16 @@ async function dispatch(): Promise<number> {
     return runMigrate(production, process.cwd());
   }
 
-  const known = ['dev', 'build', 'env', 'commands push', 'commands delete', 'generate event', 'migrate'];
+  const known = [
+    'dev',
+    'build',
+    'env',
+    'commands push',
+    'commands delete',
+    'generate event',
+    'generate model',
+    'migrate',
+  ];
   const label = command ?? '(no command)';
   throw new Error(
     `disbord: unknown or not-yet-implemented command "${label}".\n` +

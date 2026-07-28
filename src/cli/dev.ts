@@ -1,11 +1,20 @@
 import { mkdirSync, watch, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { runCommands } from './commands';
 import { spawnWithDotenvx } from './dotenvxSpawn';
 import { generateMainSource, scanEventFiles } from './generate';
+import { runMigrate } from './migrate';
 import { readBotConfig } from './readBotConfig';
 
 function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+async function runStartupStep(label: string, run: () => Promise<number>): Promise<void> {
+  const exitCode = await run();
+  if (exitCode !== 0) {
+    throw new Error(`disbord: ${label}に失敗しました（終了コード ${exitCode}）`);
+  }
 }
 
 export async function runDev(cwd: string = process.cwd()): Promise<void> {
@@ -16,6 +25,11 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
+
+  await runStartupStep('slashCommandの登録(commands push)', () => runCommands('push', 'development', cwd));
+  if (dbEnabled) {
+    await runStartupStep('migrate', () => runMigrate(false, cwd));
+  }
 
   let lastEventNames = scanEventFiles(eventsDir);
   writeFileSync(mainPath, generateMainSource(lastEventNames, { origin: 'dev', dbEnabled }));
