@@ -22,6 +22,7 @@
     "@dotenvx/dotenvx": "^2.19.0",
     "@libsql/client": "^0.17.2",
     "discord.js": "^14.21.0",
+    "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.1"
   },
   "devDependencies": {

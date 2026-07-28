@@ -4,8 +4,17 @@ import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
 import { parseEnvArgs, runEnvToggle } from './env';
 import { runGenerateEvent } from './generateEvent';
+import { parseMigrateArgs, runMigrate } from './migrate';
 
-const IMPLEMENTED_COMMANDS = ['dev', 'build', 'commands push', 'commands delete', 'env', 'generate event'];
+const IMPLEMENTED_COMMANDS = [
+  'dev',
+  'build',
+  'commands push',
+  'commands delete',
+  'env',
+  'generate event',
+  'migrate',
+];
 
 // oxlint-disable-next-line complexity
 async function dispatch(): Promise<number> {
@@ -40,7 +49,12 @@ async function dispatch(): Promise<number> {
     return 0;
   }
 
-  const known = ['dev', 'build', 'env', 'commands push', 'commands delete', 'generate event'];
+  if (command === 'migrate') {
+    const { production } = parseMigrateArgs([sub, ...rest]);
+    return runMigrate(production, process.cwd());
+  }
+
+  const known = ['dev', 'build', 'env', 'commands push', 'commands delete', 'generate event', 'migrate'];
   const label = command ?? '(no command)';
   throw new Error(
     `disbord: unknown or not-yet-implemented command "${label}".\n` +

@@ -4,6 +4,21 @@ export { createCoreStore, resolveInstanceKey, type CoreStore } from './core/stor
 export { db } from './db/db';
 export { createDbClient } from './db/client';
 export { Model, type BaseProps } from './db/Model';
+export { buildSchema, type ModelClass } from './db/buildSchema';
+export {
+  Column,
+  CompoundIndex,
+  CompoundUnique,
+  Index,
+  PrimaryKey,
+  Relate,
+  Table,
+  Unique,
+  type ColumnMode,
+  type ColumnOptions,
+  type ColumnType,
+  type RelateOptions,
+} from './db/decorators';
 export { makeButtonRow, routeButtonInteraction } from './components/buttons';
 export {
   type ButtonInteraction,
