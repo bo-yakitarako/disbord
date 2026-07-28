@@ -4,7 +4,19 @@ import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
 import { parseEnvArgs, runEnvToggle } from './env';
 import { runGenerateEvent } from './generateEvent';
+import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
+import { readBotConfig } from './readBotConfig';
+import { getDisbordVersion } from './version';
+
+async function resolveDbEnabled(cwd: string): Promise<boolean> {
+  try {
+    const config = await readBotConfig(cwd);
+    return Boolean(config.db?.enable);
+  } catch {
+    return false;
+  }
+}
 
 const IMPLEMENTED_COMMANDS = [
   'dev',
@@ -19,6 +31,17 @@ const IMPLEMENTED_COMMANDS = [
 // oxlint-disable-next-line complexity
 async function dispatch(): Promise<number> {
   const [command, sub, ...rest] = Bun.argv.slice(2);
+
+  if (command === '--version' || command === '-v') {
+    console.log(getDisbordVersion());
+    return 0;
+  }
+
+  if (command === 'help' || command === '--help' || command === '-h') {
+    const dbEnabled = await resolveDbEnabled(process.cwd());
+    console.log(buildHelpText({ dbEnabled }));
+    return 0;
+  }
 
   if (command === 'dev') {
     await runDev();
