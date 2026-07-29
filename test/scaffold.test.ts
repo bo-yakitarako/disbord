@@ -11,6 +11,7 @@ import {
   generateOxfmtrc,
   generateOxlintConfig,
   generatePackageJson,
+  generateReadme,
   generateReadyEvent,
   generateSelectMenusStub,
   generateSlashCommandsStub,
@@ -275,5 +276,31 @@ describe('その他の静的テンプレート', () => {
   test('generateMiseToml: bunは`latest`ではなく固定バージョン', () => {
     const content = generateMiseToml();
     expect(content).not.toContain('"latest"');
+  });
+});
+
+describe('generateReadme', () => {
+  test('タイトルにbot名を使う', () => {
+    const content = generateReadme('my-bot');
+    expect(content).toContain('# my-bot');
+  });
+
+  test('インストール・クイックスタートの節は含まない', () => {
+    const content = generateReadme('my-bot');
+    expect(content).not.toContain('## インストール');
+    expect(content).not.toContain('## クイックスタート');
+    expect(content).not.toContain('bunx create-disbord-app');
+  });
+
+  test('disbord.config.ts/CLIコマンド/components/events/Core機構/DB層/エラーハンドリング/lint節を含む', () => {
+    const content = generateReadme('my-bot');
+    expect(content).toContain('## `disbord.config.ts`');
+    expect(content).toContain('## CLIコマンド');
+    expect(content).toContain('## components（`src/components/`）');
+    expect(content).toContain('## events（`src/events/`）');
+    expect(content).toContain('## Core機構');
+    expect(content).toContain('## DB層（`src/db/models/`）');
+    expect(content).toContain('## エラーハンドリング');
+    expect(content).toContain('## Lint / Format / テスト');
   });
 });
