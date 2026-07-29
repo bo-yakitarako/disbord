@@ -6,16 +6,19 @@ const COMMANDS: CommandHelp[] = [
   { usage: 'disbord commands push [--env development|production]', description: 'slashCommandをDiscordへREST登録する' },
   { usage: 'disbord commands delete [--env development|production]', description: '登録済みslashCommandを削除する' },
   {
-    usage: 'disbord env [--production]',
-    description: 'env/配下の環境変数を暗号化⇔復号にtoggleする（disbord.d.tsのprocess.env型も再生成する）',
+    usage: 'disbord env [--production|--all]',
+    description:
+      'env/配下の環境変数を暗号化⇔復号にtoggleする（disbord.d.tsのprocess.env型も再生成する。--allはdevelopment/production両方を並列にtoggleする）',
   },
   {
-    usage: 'disbord env encrypt [--production]',
-    description: 'env/配下の環境変数を暗号化する（toggleと違い常に暗号化のみ行う）',
+    usage: 'disbord env encrypt [--production|--all]',
+    description:
+      'env/配下の環境変数を暗号化する（toggleと違い常に暗号化のみ行う。--allはdevelopment/production両方を並列に暗号化する）',
   },
   {
-    usage: 'disbord env decrypt [--production]',
-    description: 'env/配下の環境変数を復号する（toggleと違い常に復号のみ行う）',
+    usage: 'disbord env decrypt [--production|--all]',
+    description:
+      'env/配下の環境変数を復号する（toggleと違い常に復号のみ行う。--allはdevelopment/production両方を並列に復号する）',
   },
   { usage: 'disbord generate event <name>', description: 'イベントハンドラを追加生成する' },
   {

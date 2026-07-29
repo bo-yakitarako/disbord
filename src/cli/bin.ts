@@ -4,7 +4,7 @@ import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
 import { parseDisableArgs, runDisable } from './disable';
 import { parseEnableArgs, runEnable } from './enable';
-import { parseEnvArgs, runEnvAction, runEnvToggle } from './env';
+import { parseEnvArgs, runEnvAction, runEnvActionAll, runEnvToggle, runEnvToggleAll } from './env';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
 import { buildHelpText } from './help';
@@ -71,11 +71,11 @@ async function dispatch(): Promise<number> {
 
   if (command === 'env') {
     if (sub === 'encrypt' || sub === 'decrypt') {
-      const { envTarget } = parseEnvArgs(rest);
-      return runEnvAction(sub, envTarget, process.cwd());
+      const { envTarget, all } = parseEnvArgs(rest);
+      return all ? runEnvActionAll(sub, process.cwd()) : runEnvAction(sub, envTarget, process.cwd());
     }
-    const { envTarget } = parseEnvArgs([sub, ...rest]);
-    return runEnvToggle(envTarget, process.cwd());
+    const { envTarget, all } = parseEnvArgs([sub, ...rest]);
+    return all ? runEnvToggleAll(process.cwd()) : runEnvToggle(envTarget, process.cwd());
   }
 
   if (command === 'generate') {

@@ -21,6 +21,11 @@ const BUN_VERSION = '1.3.13';
 const OXLINT_VERSION_RANGE = '^1.76.0';
 
 /**
+ * 生成するbotが使うlefthookのバージョン(oxlint/oxfmtと同様、`latest`ではなく固定バージョンで指定する)。
+ */
+const LEFTHOOK_VERSION_RANGE = '^2.1.6';
+
+/**
  * `create-disbord-app`が生成する初期スケルトンのうち、`--db`/`--core-class`に依存しない
  * base package.json(依存・scriptsの追加は`disbord enable db`が担う。「オプションの生成処理は
  * 全てdisbord enableから行う」構成のため、この関数自体はdbを一切知らない)。
@@ -47,6 +52,9 @@ export function generatePackageJson(name: string): string {
           encrypt: 'disbord env encrypt',
           decrypt: 'disbord env decrypt',
           help: 'disbord help',
+          // lefthookのgit hooks配線はbun installのたびに冪等に効かせたいためpostinstallで行う
+          // (npm lifecycle scriptのため、他のdisbordサブコマンド群とは別枠でscriptsの末尾に置く)。
+          postinstall: 'lefthook install --reset-hooks-path',
         },
         dependencies: {
           disbord: DISBORD_VERSION_RANGE,
@@ -59,6 +67,7 @@ export function generatePackageJson(name: string): string {
           typescript: '^7.0.2',
           oxlint: OXLINT_VERSION_RANGE,
           oxfmt: '^0.61.0',
+          lefthook: LEFTHOOK_VERSION_RANGE,
         },
       },
       null,
@@ -203,6 +212,30 @@ export function generateGitignore(): string {
 dist/
 .disbord/
 env/.env.keys.*
+`;
+}
+
+/**
+ * pre-commitでfmt/lint/encryptを強制する。encryptは`--all`でdevelopment/productionの
+ * 両方を対象にする(片方だけ手動decryptしたまま暗黙にcommitされてしまう事故を防ぐため)。
+ * `bun run fmt`によるステージ後の書き換え分は`stage_fixed: true`で自動的に再ステージする。
+ * `mise exec --`で各コマンドをラップするのは、git hookがインタラクティブシェルの外で
+ * 実行されmiseのシェル統合(cd時の自動バージョン切り替え)が効かないため。ラップしないと
+ * PATH上の任意バージョンのbunが使われてしまい、mise.tomlで固定したバージョンと
+ * ずれる可能性がある。
+ */
+export function generateLefthookConfig(): string {
+  return `pre-commit:
+  piped: true
+  commands:
+    lint:
+      run: mise exec -- bun run lint
+    fmt:
+      run: mise exec -- bun run fmt
+      stage_fixed: true
+    encrypt:
+      run: mise exec -- bun run encrypt -- --all
+      stage_fixed: true
 `;
 }
 

@@ -7,12 +7,21 @@ import { generateDisbordDts } from '../src/cli/scaffold';
 
 describe('parseEnvArgs', () => {
   test('引数なし時はdevelopmentにfallbackする', () => {
-    expect(parseEnvArgs([])).toEqual({ envTarget: 'development' });
-    expect(parseEnvArgs([undefined])).toEqual({ envTarget: 'development' });
+    expect(parseEnvArgs([])).toEqual({ envTarget: 'development', all: false });
+    expect(parseEnvArgs([undefined])).toEqual({ envTarget: 'development', all: false });
   });
 
   test('--productionでenvTargetをproductionに固定できる', () => {
-    expect(parseEnvArgs(['--production'])).toEqual({ envTarget: 'production' });
+    expect(parseEnvArgs(['--production'])).toEqual({ envTarget: 'production', all: false });
+  });
+
+  test('--allでall: trueになる(envTargetはdevelopmentのまま、呼び出し側は無視する想定)', () => {
+    expect(parseEnvArgs(['--all'])).toEqual({ envTarget: 'development', all: true });
+  });
+
+  test('--allと--productionの同時指定はthrow(どちらを優先すべきか一意に決まらないため)', () => {
+    expect(() => parseEnvArgs(['--all', '--production'])).toThrow();
+    expect(() => parseEnvArgs(['--production', '--all'])).toThrow();
   });
 
   test('未知の余分な引数はthrow', () => {

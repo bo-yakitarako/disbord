@@ -6,6 +6,7 @@ import {
   generateDisbordDts,
   generateEnvPlaceholder,
   generateGitignore,
+  generateLefthookConfig,
   generateMiseToml,
   generateOxfmtrc,
   generateOxlintConfig,
@@ -51,6 +52,19 @@ describe('generatePackageJson', () => {
     expect(keys.indexOf('encrypt')).toBe(keys.indexOf('env') + 1);
     expect(keys.indexOf('decrypt')).toBe(keys.indexOf('encrypt') + 1);
     expect(keys.indexOf('help')).toBe(keys.indexOf('decrypt') + 1);
+  });
+
+  test('postinstallでlefthookのgit hooksを配線する(helpの直後に並ぶ)', () => {
+    const content = JSON.parse(generatePackageJson('my-bot'));
+    const keys = Object.keys(content.scripts);
+    expect(content.scripts.postinstall).toBe('lefthook install --reset-hooks-path');
+    expect(keys.indexOf('postinstall')).toBe(keys.indexOf('help') + 1);
+  });
+
+  test('lefthookはdevDependenciesに固定バージョンで含まれる', () => {
+    const content = JSON.parse(generatePackageJson('my-bot'));
+    expect(content.devDependencies.lefthook).toBeDefined();
+    expect(content.devDependencies.lefthook).not.toBe('latest');
   });
 
   test('db関連の依存・gen:model/migrateスクリプトは含まない(disbord enable --dbが後から追加する)', () => {
@@ -116,6 +130,36 @@ describe('generateOxfmtrc', () => {
   test('.disbord/*をignorePatternsに含む', () => {
     const content = JSON.parse(generateOxfmtrc());
     expect(content.ignorePatterns).toContain('.disbord/*');
+  });
+});
+
+describe('generateLefthookConfig', () => {
+  test('pre-commitでlint/fmt/encryptを実行する', () => {
+    const content = generateLefthookConfig();
+    expect(content).toContain('pre-commit:');
+    expect(content).toContain('bun run lint');
+    expect(content).toContain('bun run fmt');
+    expect(content).toContain('bun run encrypt -- --all');
+  });
+
+  test('fmt/encryptはstage_fixedでコミット対象に自動再ステージする', () => {
+    const content = generateLefthookConfig();
+    const fmtBlock = content.split('fmt:')[1]?.split('encrypt:')[0];
+    const encryptBlock = content.split('encrypt:')[1];
+    expect(fmtBlock).toContain('stage_fixed: true');
+    expect(encryptBlock).toContain('stage_fixed: true');
+  });
+
+  test('encryptは--allでdevelopment/production両方を対象にする(片方だけ暗号化漏れの事故を防ぐ)', () => {
+    const content = generateLefthookConfig();
+    expect(content).not.toContain('--production');
+  });
+
+  test('mise execでラップし、git hook実行時にもmise.tomlで固定したbunバージョンを使う', () => {
+    const content = generateLefthookConfig();
+    expect(content).toContain('mise exec -- bun run lint');
+    expect(content).toContain('mise exec -- bun run fmt');
+    expect(content).toContain('mise exec -- bun run encrypt -- --all');
   });
 });
 
