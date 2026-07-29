@@ -45,9 +45,9 @@ function disableDb(cwd: string, config: Config): void {
   writePackageJson(cwd, removeDbFromPackageJson(readPackageJson(cwd)));
 
   rmSync(join(cwd, 'src/db/models'), { recursive: true, force: true });
-  rmSync(join(cwd, 'src/db/schema.ts'), { force: true });
+  rmSync(join(cwd, '.disbord/db/schema.ts'), { force: true });
   rmSync(join(cwd, 'migrations'), { recursive: true, force: true });
-  rmSync(join(cwd, '.disbord/dev.db'), { force: true });
+  rmSync(join(cwd, '.disbord/db/dev.db'), { force: true });
 
   const prodEnvPath = join(cwd, 'env/.env.production');
   if (existsSync(prodEnvPath)) {

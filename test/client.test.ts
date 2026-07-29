@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createDbClient } from '../src/db/client';
 import { getDbState } from '../src/db/state';
 
@@ -19,5 +22,19 @@ describe('createDbClient', () => {
     createDbClient({}, { url: ':memory:' });
 
     expect(getDbState().db).toBeDefined();
+  });
+
+  test('url未指定(ローカルsqlite)の場合、.disbord/db/が無くても自動生成してdev.dbを作成する(@libsql/clientは親ディレクトリを自動生成しないため。実機確認済み)', () => {
+    delete process.env.TURSO_DATABASE_URL;
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-client-'));
+    const originalCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      createDbClient({});
+      expect(existsSync(join(dir, '.disbord/db/dev.db'))).toBe(true);
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

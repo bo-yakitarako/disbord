@@ -22,7 +22,7 @@ const COMMANDS: CommandHelp[] = [
   },
   {
     usage: 'disbord studio',
-    description: '.disbord/dev.dbを対象にdrizzle studioサーバーを起動する',
+    description: '.disbord/db/dev.dbを対象にdrizzle studioサーバーを起動する',
     requiresDb: true,
   },
   {

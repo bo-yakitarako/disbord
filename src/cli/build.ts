@@ -4,6 +4,7 @@ import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { generateMainSource, scanEventFiles } from './generate';
 import { readBotConfig } from './readBotConfig';
+import { regenerateSchemaFile } from './schemaGen';
 
 export function parseBuildArgs(args: (string | undefined)[]): { external: string[] } {
   const external: string[] = [];
@@ -34,6 +35,11 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   // dev.tsと同様、`.disbord/`ごと削除されていてもbuild単体でdisbord.d.tsを再構築できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
+  // schema.tsも`.disbord/`配下(gitignore対象)のため、`disbord migrate`未実行のクリーンな
+  // チェックアウトから`disbord build`だけを叩いても.disbord/main.tsのbundleが解決できるようにする。
+  if (dbEnabled) {
+    await regenerateSchemaFile(cwd);
+  }
 
   writeFileSync(
     join(cwd, '.disbord/main.ts'),

@@ -1,6 +1,20 @@
 import { readdirSync } from 'node:fs';
+import { Events } from 'discord.js';
 
 const RESERVED_EVENT_NAME = 'interactionCreate';
+
+/**
+ * `Events`の値→キー逆引き。ほとんどのイベントはキー名の先頭を大文字にするだけでは
+ * 値と一致しない（例: `GuildRoleCreate` = 'roleCreate'、`MessageBulkDelete` = 'messageDeleteBulk'）
+ * ため、単純な文字列変換ではなく実際のenumから引く。
+ */
+const EVENT_KEY_BY_VALUE = new Map((Object.entries(Events) as [string, string][]).map(([key, value]) => [value, key]));
+
+/**
+ * `ready`は歴史的経緯のファイル名で、discord.jsの`Events`値としては存在しない
+ * （実際の値は`clientReady`で非推奨の`ready`文字列とは異なる）ため個別対応する。
+ */
+const EVENT_KEY_OVERRIDES: Record<string, string> = { ready: 'ClientReady' };
 
 export function scanEventFiles(eventsDir: string): string[] {
   const names = readdirSync(eventsDir, { withFileTypes: true })
@@ -22,7 +36,8 @@ function handlerIdentifier(eventName: string): string {
 }
 
 function eventBindingTarget(eventName: string): string {
-  return eventName === 'ready' ? 'Events.ClientReady' : `'${eventName}'`;
+  const key = EVENT_KEY_OVERRIDES[eventName] ?? EVENT_KEY_BY_VALUE.get(eventName);
+  return key ? `Events.${key}` : `'${eventName}'`;
 }
 
 export type GenerateMainSourceOptions = {
@@ -53,7 +68,7 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
     'setComponentsState',
     ...(dbEnabled ? ['createDbClient'] : []),
   ];
-  const schemaImport = dbEnabled ? `\nimport { schema } from '../src/db/schema';` : '';
+  const schemaImport = dbEnabled ? `\nimport { schema } from './db/schema';` : '';
   const dbInit = dbEnabled
     ? `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`
     : '';
@@ -65,17 +80,17 @@ import { Client, Events } from 'discord.js';
 import {
   ${disbordImports.join(',\n  ')},
 } from 'disbord';
-import rawConfig from '../disbord.config';${schemaImport}${coreClassImport}
+import rawConfig from '../disbord.config';
+import buttons from '../src/components/buttons';
+import selectMenus from '../src/components/selectMenus';
+import slashCommands from '../src/components/slashCommands';${schemaImport}${coreClassImport}
 ${eventImports}
 
 async function main() {
   // satisfiesの推論型(disbord.config.ts側のexcess property check維持のため)をConfigへ広げる
   const config = rawConfig as Config;
 
-${dbInit}  const buttons = (await import('../src/components/buttons')).default;
-  const selectMenus = (await import('../src/components/selectMenus')).default;
-  const slashCommands = (await import('../src/components/slashCommands')).default;
-  setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });
+${dbInit}  setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });
 
   const client = new Client({ intents: config.intents });
 

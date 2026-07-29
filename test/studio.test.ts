@@ -16,9 +16,9 @@ describe('generateDrizzleStudioConfig', () => {
     const content = generateDrizzleStudioConfig('/tmp/my-bot');
     expect(content).toContain(`import { defineConfig } from 'drizzle-kit';`);
     expect(content).toContain(`dialect: 'sqlite'`);
-    expect(content).toContain(`schema: '/tmp/my-bot/src/db/schema.ts'`);
+    expect(content).toContain(`schema: '/tmp/my-bot/.disbord/db/schema.ts'`);
     expect(content).toContain(`out: '/tmp/my-bot/migrations'`);
-    expect(content).toContain(`url: 'file:/tmp/my-bot/.disbord/dev.db'`);
+    expect(content).toContain(`url: 'file:/tmp/my-bot/.disbord/db/dev.db'`);
   });
 });
 

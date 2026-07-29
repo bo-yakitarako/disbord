@@ -102,7 +102,7 @@ describe('runEnable', () => {
     expect(pkg.dependencies['@libsql/client']).toBe('^0.17.2');
 
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
-    expect(dts).toContain(`from '@/db/schema'`);
+    expect(dts).toContain(`from './db/schema'`);
   });
 
   test('dbでenv/.env.productionにTURSO_DATABASE_URL/TURSO_AUTH_TOKENを追記し、disbord.d.tsのprocess.env型にもoptionalで反映する', async () => {
@@ -161,7 +161,7 @@ describe('runEnable', () => {
     expect(coreClassIndex).toBeLessThan(botErrorMessageIndex);
 
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
-    expect(dts).toContain(`from '@/db/schema'`);
+    expect(dts).toContain(`from './db/schema'`);
     expect(dts).toContain(`from '@/Game'`);
   });
 

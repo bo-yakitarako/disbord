@@ -25,13 +25,24 @@ describe('generateMainSource', () => {
     const source = generateMainSource(['ready', 'messageCreate']);
     expect(source).toContain(`import readyHandler from '../src/events/ready';`);
     expect(source).toContain(`import messageCreateHandler from '../src/events/messageCreate';`);
-    expect(source).toContain(`client.on('messageCreate', messageCreateHandler);`);
+    expect(source).toContain('client.on(Events.MessageCreate, messageCreateHandler);');
   });
 
-  test('readyイベントだけはEvents.ClientReadyで購読する(実際の値はclientReadyで非推奨のready文字列とは異なるため)', () => {
+  test('readyはEvents値として存在しない歴史的経緯のファイル名のためEvents.ClientReadyへ個別マッピングする(実際の値はclientReadyで非推奨のready文字列とは異なるため)', () => {
     const source = generateMainSource(['ready']);
     expect(source).toContain('client.on(Events.ClientReady, readyHandler);');
     expect(source).not.toContain(`client.on('ready', readyHandler);`);
+  });
+
+  test('discord.jsのEvents値とキー名が単純な先頭大文字化では一致しないイベントも、実際のenumキーへ正しく逆引きする', () => {
+    const source = generateMainSource(['roleCreate', 'messageDeleteBulk']);
+    expect(source).toContain('client.on(Events.GuildRoleCreate, roleCreateHandler);');
+    expect(source).toContain('client.on(Events.MessageBulkDelete, messageDeleteBulkHandler);');
+  });
+
+  test('discord.jsのEventsに存在しないイベント名は生文字列のままbindする(フォールバック)', () => {
+    const source = generateMainSource(['someUnknownEvent']);
+    expect(source).toContain(`client.on('someUnknownEvent', someUnknownEventHandler);`);
   });
 
   test('イベントが1つもない場合でも有効なソースを生成する(ぶら下がりimportなし)', () => {
@@ -40,11 +51,12 @@ describe('generateMainSource', () => {
     expect(source).toContain('async function main()');
   });
 
-  test('componentsは動的importされる', () => {
+  test('componentsは静的importされる(events同様、bundleでの解決を優先するため)', () => {
     const source = generateMainSource([]);
-    expect(source).toContain(`await import('../src/components/buttons')`);
-    expect(source).toContain(`await import('../src/components/selectMenus')`);
-    expect(source).toContain(`await import('../src/components/slashCommands')`);
+    expect(source).toContain(`import buttons from '../src/components/buttons';`);
+    expect(source).toContain(`import selectMenus from '../src/components/selectMenus';`);
+    expect(source).toContain(`import slashCommands from '../src/components/slashCommands';`);
+    expect(source).not.toContain('await import(');
   });
 
   test('slashCommandのREST登録は一切含まない(disbord commands pushが唯一の登録手段のため)', () => {
@@ -61,13 +73,11 @@ describe('generateMainSource', () => {
     expect(source).toContain('routeSlashCommandInteraction(interaction, slashCommands)');
   });
 
-  test('setComponentsStateはcomponentsの動的import直後・Client生成より前に呼ばれる', () => {
+  test('setComponentsStateはClient生成より前に呼ばれる', () => {
     const source = generateMainSource([]);
     expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
-    const importsIdx = source.indexOf(`await import('../src/components/slashCommands')`);
     const setStateIdx = source.indexOf('setComponentsState(');
     const clientIdx = source.indexOf('new Client(');
-    expect(importsIdx).toBeLessThan(setStateIdx);
     expect(setStateIdx).toBeLessThan(clientIdx);
   });
 
@@ -103,7 +113,7 @@ describe('generateMainSource', () => {
 
   test('coreClassName未指定時はCoreクラスのimport・factory呼び出しを一切含まない', () => {
     const source = generateMainSource([]);
-    expect(source).not.toContain("from '../src/");
+    expect(source).not.toContain("from '../src/Core'");
     expect(source).toContain("createCoreStore(config.coreClass.instanceLevel ?? 'guild')");
   });
 
@@ -147,7 +157,7 @@ describe('generateMainSource', () => {
   test('dbEnabled: trueはschema importとcreateDbClient呼び出し(config.db由来のTurso接続情報付き)を含む', () => {
     const source = generateMainSource([], { dbEnabled: true });
     expect(source).toContain('createDbClient');
-    expect(source).toContain(`import { schema } from '../src/db/schema';`);
+    expect(source).toContain(`import { schema } from './db/schema';`);
     expect(source).toContain(
       'createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });',
     );

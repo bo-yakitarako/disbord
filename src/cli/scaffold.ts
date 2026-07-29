@@ -79,7 +79,7 @@ export const DB_STUDIO_SCRIPT = { name: 'studio', command: 'disbord studio' } as
 
 /**
  * db有効時に`disbord enable db`/`disable db`が`env/.env.production`へ追加・削除する
- * キー一覧(「DB層」節参照。本番接続先はTursoのみを想定し、ローカル開発は`.disbord/dev.db`固定のため
+ * キー一覧(「DB層」節参照。本番接続先はTursoのみを想定し、ローカル開発は`.disbord/db/dev.db`固定のため
  * `env/.env.development`側には追加しない)。
  */
 export const DB_ENV_KEYS = ['TURSO_DATABASE_URL', 'TURSO_AUTH_TOKEN'];
@@ -248,7 +248,7 @@ export function generateDisbordDts(options: {
   const coreClassName = options.coreClassName ?? DEFAULT_CORE_CLASS_NAME;
   const coreImportLine = options.coreClass ? `\nimport type { ${coreClassName} } from '@/${coreClassName}';` : '';
   const coreField = options.coreClass ? `\n    core: InstanceType<typeof ${coreClassName}>;` : '';
-  const schemaImportLine = options.db ? `\nimport type { schema } from '@/db/schema';` : '';
+  const schemaImportLine = options.db ? `\nimport type { schema } from './db/schema';` : '';
   const schemaField = options.db ? '\n    schema: typeof schema;' : '';
   const envKeys = options.envKeys ?? [];
   const envBlock =

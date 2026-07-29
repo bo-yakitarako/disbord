@@ -110,7 +110,7 @@ export default {
 
       const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
       expect(dts).toContain(`from '@/Game'`);
-      expect(dts).toContain(`from '@/db/schema'`);
+      expect(dts).toContain(`from './db/schema'`);
       expect(dts).toContain('TOKEN: string;');
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -130,7 +130,7 @@ export default {
 
       const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
       expect(dts).toContain(`from '@/Game'`);
-      expect(dts).toContain(`from '@/db/schema'`);
+      expect(dts).toContain(`from './db/schema'`);
       expect(dts).toContain('TOKEN: string;');
     } finally {
       rmSync(dir, { recursive: true, force: true });
