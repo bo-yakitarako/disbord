@@ -6,6 +6,7 @@ export type InstanceLevel = 'guild' | 'category' | 'channel' | 'user' | 'global'
 export type Config = {
   token?: string;
   clientId?: string;
+  guildId?: string;
   intents: ClientOptions['intents'];
   coreClass?: {
     enable: true;

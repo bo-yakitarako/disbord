@@ -32,6 +32,9 @@ beforeEach(() => {
   writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
   mkdirSync(join(dir, 'src/components'), { recursive: true });
   mkdirSync(join(dir, '.disbord'), { recursive: true });
+  mkdirSync(join(dir, 'env'), { recursive: true });
+  writeFileSync(join(dir, 'env/.env.development'), 'TOKEN=\nCLIENT_ID=\nGUILD_ID=\n');
+  writeFileSync(join(dir, 'env/.env.production'), 'TOKEN=\nCLIENT_ID=\n');
   writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
   writeFileSync(
     join(dir, 'src/components/buttons.ts'),
@@ -100,6 +103,28 @@ describe('runEnable', () => {
 
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).toContain(`from '@/db/schema'`);
+  });
+
+  test('dbでenv/.env.productionにTURSO_DATABASE_URL/TURSO_AUTH_TOKENを追記し、disbord.d.tsのprocess.env型にもoptionalで反映する', async () => {
+    await runEnable(dir, { target: 'db' });
+
+    const prodEnv = readFileSync(join(dir, 'env/.env.production'), 'utf-8');
+    expect(prodEnv).toContain('TURSO_DATABASE_URL=');
+    expect(prodEnv).toContain('TURSO_AUTH_TOKEN=');
+    expect(readFileSync(join(dir, 'env/.env.development'), 'utf-8')).not.toContain('TURSO_DATABASE_URL');
+
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
+    expect(dts).toContain('TURSO_DATABASE_URL?: string;');
+    expect(dts).toContain('TURSO_AUTH_TOKEN?: string;');
+  });
+
+  test('env/.env.productionが存在しない場合でも新規作成してTURSO系キーを書き込む', async () => {
+    rmSync(join(dir, 'env/.env.production'));
+
+    await runEnable(dir, { target: 'db' });
+
+    const prodEnv = readFileSync(join(dir, 'env/.env.production'), 'utf-8');
+    expect(prodEnv).toBe('TURSO_DATABASE_URL=\nTURSO_AUTH_TOKEN=\n');
   });
 
   test('core-class Nameでsrc/{Name}.tsを生成し、disbord.d.tsにRegistryフィールドを追加する', async () => {

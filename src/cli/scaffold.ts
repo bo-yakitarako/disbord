@@ -1,3 +1,4 @@
+import type { EnvTarget } from './dotenvxSpawn';
 import type { EnvKeyType } from './envTypes';
 
 /**
@@ -75,6 +76,13 @@ export const DB_DEPENDENCIES: Record<string, string> = {
 export const DB_GEN_MODEL_SCRIPT = { name: 'gen:model', command: 'disbord generate model' } as const;
 export const DB_MIGRATE_SCRIPT = { name: 'migrate', command: 'disbord migrate' } as const;
 export const DB_STUDIO_SCRIPT = { name: 'studio', command: 'disbord studio' } as const;
+
+/**
+ * db有効時に`disbord enable db`/`disable db`が`env/.env.production`へ追加・削除する
+ * キー一覧(「DB層」節参照。本番接続先はTursoのみを想定し、ローカル開発は`.disbord/dev.db`固定のため
+ * `env/.env.development`側には追加しない)。
+ */
+export const DB_ENV_KEYS = ['TURSO_DATABASE_URL', 'TURSO_AUTH_TOKEN'];
 
 /**
  * `--db`/`--core-class`に依存しない最小構成のdisbord.config.ts。
@@ -269,8 +277,18 @@ declare module 'disbord' {
 ${envBlock}`;
 }
 
-export function generateEnvPlaceholder(): string {
-  return `TOKEN=
+/**
+ * `GUILD_ID`はguild単位のslashCommand登録(`disbord commands push`。反映が即時で開発向き)を
+ * 有効にするためのキーで、開発時のみ既定で置く。本番はglobal登録(反映まで最大1時間)のままでよいため
+ * `env/.env.production`側には含めない。
+ */
+export function generateEnvPlaceholder(envTarget: EnvTarget): string {
+  return envTarget === 'development'
+    ? `TOKEN=
+CLIENT_ID=
+GUILD_ID=
+`
+    : `TOKEN=
 CLIENT_ID=
 `;
 }

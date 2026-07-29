@@ -121,9 +121,16 @@ describe('generateMainSource', () => {
     expect(source).toContain('() => new GameMaster()');
   });
 
-  test('tokenの環境変数名はconfig未指定時にTOKENへfallbackする', () => {
+  test('tokenはconfig.tokenを優先し、未指定時はprocess.env.TOKENへfallbackする', () => {
     const source = generateMainSource([]);
-    expect(source).toContain(`process.env[config.token ?? 'TOKEN']`);
+    expect(source).toContain('config.token ?? process.env.TOKEN');
+  });
+
+  test('disbord.config.tsのsatisfies由来の狭い推論型をConfigへ広げてから使う(未定義プロパティアクセスの型エラー対策)', () => {
+    const source = generateMainSource([]);
+    expect(source).toContain(`import rawConfig from '../disbord.config';`);
+    expect(source).toContain('type Config');
+    expect(source).toContain('const config = rawConfig as Config;');
   });
 
   test('BotErrorはconfig.botErrorMessageでhandleBotErrorに渡される', () => {
@@ -137,16 +144,18 @@ describe('generateMainSource', () => {
     expect(source).not.toContain('db/schema');
   });
 
-  test('dbEnabled: trueはschema importとcreateDbClient呼び出しを含む', () => {
+  test('dbEnabled: trueはschema importとcreateDbClient呼び出し(config.db由来のTurso接続情報付き)を含む', () => {
     const source = generateMainSource([], { dbEnabled: true });
     expect(source).toContain('createDbClient');
     expect(source).toContain(`import { schema } from '../src/db/schema';`);
-    expect(source).toContain('createDbClient(schema);');
+    expect(source).toContain(
+      'createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });',
+    );
   });
 
   test('dbEnabled: trueのcreateDbClient呼び出しはclient生成より前', () => {
     const source = generateMainSource([], { dbEnabled: true });
-    expect(source.indexOf('createDbClient(schema)')).toBeLessThan(source.indexOf('new Client('));
+    expect(source.indexOf('createDbClient(schema,')).toBeLessThan(source.indexOf('new Client('));
   });
 
   test('dbEnabled: falseはschema importを含まない', () => {

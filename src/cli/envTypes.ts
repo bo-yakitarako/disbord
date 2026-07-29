@@ -4,7 +4,7 @@ import type { EnvTarget } from './dotenvxSpawn';
 
 export type EnvKeyType = { key: string; required: boolean };
 
-const KEY_LINE_PATTERN = /^([A-Za-z_][A-Za-z0-9_]*)=/;
+export const KEY_LINE_PATTERN = /^([A-Za-z_][A-Za-z0-9_]*)=/;
 
 /**
  * dotenvxの平文/暗号化どちらの状態でもキー名自体は常に平文で残る

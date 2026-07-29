@@ -1,13 +1,14 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { buildCoreClassConfigBlock, buildDbConfigBlock, insertConfigBlock } from './configPatch';
 import { applyCoreParamRewrite, toCamelCase } from './coreParamCodemod';
 import { regenerateDisbordDts } from './dtsRegen';
+import { addEnvKeys } from './envPatch';
 import { addDbToPackageJson, readPackageJson, writePackageJson } from './packageJsonPatch';
 import { CORE_CLASS_NAME_PATTERN, promptCoreClassName } from './prompt';
 import { readBotConfig } from './readBotConfig';
-import { DEFAULT_CORE_CLASS_NAME, generateCoreStub } from './scaffold';
+import { DB_ENV_KEYS, DEFAULT_CORE_CLASS_NAME, generateCoreStub } from './scaffold';
 
 export type EnableArgs = { target: 'db' } | { target: 'core-class'; name: string | undefined };
 
@@ -52,6 +53,11 @@ async function enableDb(cwd: string, config: Config): Promise<void> {
   const configPath = join(cwd, 'disbord.config.ts');
   writeFileSync(configPath, insertConfigBlock(readFileSync(configPath, 'utf-8'), buildDbConfigBlock()));
   writePackageJson(cwd, addDbToPackageJson(readPackageJson(cwd)));
+
+  mkdirSync(join(cwd, 'env'), { recursive: true });
+  const prodEnvPath = join(cwd, 'env/.env.production');
+  const prodEnvContent = existsSync(prodEnvPath) ? readFileSync(prodEnvPath, 'utf-8') : '';
+  writeFileSync(prodEnvPath, addEnvKeys(prodEnvContent, DB_ENV_KEYS));
 
   regenerateDisbordDts(cwd, true, Boolean(config.coreClass?.enable), config.coreClass?.className);
 

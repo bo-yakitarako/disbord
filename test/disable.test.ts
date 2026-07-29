@@ -117,6 +117,10 @@ describe('runDisable', () => {
     expect(existsSync(join(dir, '.disbord/dev.db'))).toBe(false);
     expect(existsSync(join(dir, 'src/Game.ts'))).toBe(true);
 
+    const prodEnv = readFileSync(join(dir, 'env/.env.production'), 'utf-8');
+    expect(prodEnv).not.toContain('TURSO_DATABASE_URL');
+    expect(prodEnv).not.toContain('TURSO_AUTH_TOKEN');
+
     const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8'));
     expect(pkg.scripts.migrate).toBeUndefined();
     expect(pkg.dependencies['@libsql/client']).toBeUndefined();

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient } from '@libsql/client';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
+import type { Config } from '../config';
 import { buildSchema } from '../db/buildSchema';
 import { readModelMeta } from '../db/decorators';
 import { applyPendingMigrations } from '../db/migrationRunner';
@@ -94,13 +95,14 @@ async function runDevMigrate(cwd: string): Promise<void> {
   );
 }
 
-async function runProductionMigrate(cwd: string): Promise<void> {
+async function runProductionMigrate(cwd: string, config: Config): Promise<void> {
   const migrationsDir = join(cwd, 'migrations');
-  const url = process.env.TURSO_DATABASE_URL;
+  const url = config.db?.tursoDatabaseUrl ?? process.env.TURSO_DATABASE_URL;
   if (!url) {
     throw new Error('disbord: TURSO_DATABASE_URLが設定されていません（env/.env.productionを確認してください）');
   }
-  const client = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
+  const authToken = config.db?.tursoAuthToken ?? process.env.TURSO_AUTH_TOKEN;
+  const client = createClient({ url, authToken });
   const applied = await applyPendingMigrations(client, migrationsDir);
   console.log(
     applied.length > 0
@@ -119,7 +121,7 @@ async function main() {
   }
 
   if (production) {
-    await runProductionMigrate(cwd);
+    await runProductionMigrate(cwd, config);
   } else {
     await runDevMigrate(cwd);
   }

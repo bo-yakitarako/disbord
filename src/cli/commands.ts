@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
+import { Routes, type RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
 import { collectSlashCommandsData } from '../components/slashCommands';
 import type { SlashCommandRegistration } from '../components/types';
 import { spawnWithDotenvx, type EnvTarget } from './dotenvxSpawn';
@@ -36,6 +36,14 @@ export function buildCommandsBody(
   registration: SlashCommandRegistration,
 ): RESTPostAPIChatInputApplicationCommandsJSONBody[] {
   return action === 'delete' ? [] : collectSlashCommandsData(registration);
+}
+
+/**
+ * `GUILD_ID`が解決できた場合はguild単位(反映が即時。開発向き)、なければglobal
+ * (反映まで最大1時間。従来通りの挙動)で登録する。
+ */
+export function buildCommandsRoute(clientId: string, guildId: string | undefined) {
+  return guildId ? Routes.applicationGuildCommands(clientId, guildId) : Routes.applicationCommands(clientId);
 }
 
 const commandsRunnerPath = join(import.meta.dir, 'commandsRunner.ts');

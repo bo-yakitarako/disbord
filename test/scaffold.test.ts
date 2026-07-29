@@ -179,10 +179,18 @@ describe('その他の静的テンプレート', () => {
     expect(content).toContain('export class Game {}');
   });
 
-  test('generateEnvPlaceholder: TOKEN/CLIENT_IDの空プレースホルダー', () => {
-    const content = generateEnvPlaceholder();
+  test('generateEnvPlaceholder: developmentはTOKEN/CLIENT_ID/GUILD_IDの空プレースホルダー(guild単位rest対応)', () => {
+    const content = generateEnvPlaceholder('development');
     expect(content).toContain('TOKEN=');
     expect(content).toContain('CLIENT_ID=');
+    expect(content).toContain('GUILD_ID=');
+  });
+
+  test('generateEnvPlaceholder: productionはGUILD_IDを含まない(global登録のまま)', () => {
+    const content = generateEnvPlaceholder('production');
+    expect(content).toContain('TOKEN=');
+    expect(content).toContain('CLIENT_ID=');
+    expect(content).not.toContain('GUILD_ID=');
   });
 
   test('generateGitignore: node_modules/dist/.disbord/env keysを含む', () => {

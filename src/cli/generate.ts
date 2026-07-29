@@ -44,6 +44,7 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
     .join('\n');
 
   const disbordImports = [
+    'type Config',
     'createCoreStore',
     'handleBotError',
     'routeButtonInteraction',
@@ -53,7 +54,9 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
     ...(dbEnabled ? ['createDbClient'] : []),
   ];
   const schemaImport = dbEnabled ? `\nimport { schema } from '../src/db/schema';` : '';
-  const dbInit = dbEnabled ? `  createDbClient(schema);\n\n` : '';
+  const dbInit = dbEnabled
+    ? `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`
+    : '';
   const coreClassImport = coreClassName ? `\nimport { ${coreClassName} } from '../src/${coreClassName}';` : '';
   const coreCreateArgs = coreClassName ? `, () => new ${coreClassName}(), config.coreClass.instanceInvalidMessage` : '';
 
@@ -62,10 +65,13 @@ import { Client, Events } from 'discord.js';
 import {
   ${disbordImports.join(',\n  ')},
 } from 'disbord';
-import config from '../disbord.config';${schemaImport}${coreClassImport}
+import rawConfig from '../disbord.config';${schemaImport}${coreClassImport}
 ${eventImports}
 
 async function main() {
+  // satisfiesの推論型(disbord.config.ts側のexcess property check維持のため)をConfigへ広げる
+  const config = rawConfig as Config;
+
 ${dbInit}  const buttons = (await import('../src/components/buttons')).default;
   const selectMenus = (await import('../src/components/selectMenus')).default;
   const slashCommands = (await import('../src/components/slashCommands')).default;
@@ -97,7 +103,7 @@ ${dbInit}  const buttons = (await import('../src/components/buttons')).default;
 
 ${eventBindings}
 
-  const TOKEN = process.env[config.token ?? 'TOKEN'];
+  const TOKEN = config.token ?? process.env.TOKEN;
 
   await client.login(TOKEN);
 }

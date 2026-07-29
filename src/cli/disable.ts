@@ -1,12 +1,14 @@
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { removeConfigBlock } from './configPatch';
 import { applyCoreParamRewrite } from './coreParamCodemod';
 import { regenerateDisbordDts } from './dtsRegen';
+import { removeEnvKeys } from './envPatch';
 import { readPackageJson, removeDbFromPackageJson, writePackageJson } from './packageJsonPatch';
 import { promptYesNo } from './prompt';
 import { readBotConfig } from './readBotConfig';
+import { DB_ENV_KEYS } from './scaffold';
 
 export type DisableArgs = { target: 'db' } | { target: 'core-class' };
 
@@ -46,6 +48,11 @@ function disableDb(cwd: string, config: Config): void {
   rmSync(join(cwd, 'src/db/schema.ts'), { force: true });
   rmSync(join(cwd, 'migrations'), { recursive: true, force: true });
   rmSync(join(cwd, '.disbord/dev.db'), { force: true });
+
+  const prodEnvPath = join(cwd, 'env/.env.production');
+  if (existsSync(prodEnvPath)) {
+    writeFileSync(prodEnvPath, removeEnvKeys(readFileSync(prodEnvPath, 'utf-8'), DB_ENV_KEYS));
+  }
 
   regenerateDisbordDts(cwd, false, Boolean(config.coreClass?.enable), config.coreClass?.className);
 

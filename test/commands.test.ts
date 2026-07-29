@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { ChatInputCommandInteraction } from 'discord.js';
-import { buildCommandsBody, parseCommandsArgs } from '../src/cli/commands';
+import { Routes } from 'discord.js';
+import { buildCommandsBody, buildCommandsRoute, parseCommandsArgs } from '../src/cli/commands';
 import { collectSlashCommandsData, routeSlashCommandInteraction } from '../src/components/slashCommands';
 import type { SlashCommandRegistration } from '../src/components/types';
 
@@ -50,6 +51,18 @@ describe('buildCommandsBody', () => {
 
   test('pushはcollectSlashCommandsDataの結果と一致する', () => {
     expect(buildCommandsBody('push', sampleRegistration)).toEqual(collectSlashCommandsData(sampleRegistration));
+  });
+});
+
+describe('buildCommandsRoute', () => {
+  test('guildIdが解決できない場合はglobal登録のroute', () => {
+    expect(buildCommandsRoute('123456789012345678', undefined)).toBe(Routes.applicationCommands('123456789012345678'));
+  });
+
+  test('guildIdが解決できた場合はguild単位登録のroute(反映が即時)', () => {
+    expect(buildCommandsRoute('123456789012345678', '987654321098765432')).toBe(
+      Routes.applicationGuildCommands('123456789012345678', '987654321098765432'),
+    );
   });
 });
 
