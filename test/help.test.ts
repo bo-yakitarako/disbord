@@ -13,23 +13,26 @@ describe('buildHelpText', () => {
       'disbord generate event <name>',
       'disbord generate model <Name>',
       'disbord migrate',
+      'disbord studio',
     ]) {
       expect(text).toContain(usage);
     }
   });
 
-  test('dbEnabled: falseならmigrate/generate modelを含まない', () => {
+  test('dbEnabled: falseならmigrate/generate model/studioを含まない', () => {
     const text = buildHelpText({ dbEnabled: false });
     expect(text).not.toContain('disbord migrate');
     expect(text).not.toContain('disbord generate model');
+    expect(text).not.toContain('disbord studio');
     expect(text).toContain('disbord dev');
     expect(text).toContain('disbord generate event <name>');
   });
 
-  test('dbEnabled省略時はfalse相当(migrate/generate modelを含まない)', () => {
+  test('dbEnabled省略時はfalse相当(migrate/generate model/studioを含まない)', () => {
     const text = buildHelpText();
     expect(text).not.toContain('disbord migrate');
     expect(text).not.toContain('disbord generate model');
+    expect(text).not.toContain('disbord studio');
   });
 
   test('--version/-vと--help/-hの説明を含む', () => {

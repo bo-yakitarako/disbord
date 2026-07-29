@@ -72,6 +72,7 @@ export const DB_DEPENDENCIES: Record<string, string> = {
 
 export const DB_GEN_MODEL_SCRIPT = { name: 'gen:model', command: 'disbord generate model' } as const;
 export const DB_MIGRATE_SCRIPT = { name: 'migrate', command: 'disbord migrate' } as const;
+export const DB_STUDIO_SCRIPT = { name: 'studio', command: 'disbord studio' } as const;
 
 /**
  * `--db`/`--core-class`に依存しない最小構成のdisbord.config.ts。

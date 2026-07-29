@@ -10,6 +10,7 @@ import { runGenerateModel } from './generateModel';
 import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
 import { readBotConfig } from './readBotConfig';
+import { runStudio } from './studio';
 import { getDisbordVersion } from './version';
 
 async function resolveDbEnabled(cwd: string): Promise<boolean> {
@@ -30,6 +31,7 @@ const IMPLEMENTED_COMMANDS = [
   'generate event',
   'generate model',
   'migrate',
+  'studio',
   'enable',
   'disable',
 ];
@@ -87,6 +89,10 @@ async function dispatch(): Promise<number> {
     return runMigrate(production, process.cwd());
   }
 
+  if (command === 'studio') {
+    return runStudio(process.cwd());
+  }
+
   if (command === 'enable') {
     const args = parseEnableArgs([sub, ...rest]);
     await runEnable(process.cwd(), args);
@@ -108,6 +114,7 @@ async function dispatch(): Promise<number> {
     'generate event',
     'generate model',
     'migrate',
+    'studio',
     'enable',
     'disable',
   ];

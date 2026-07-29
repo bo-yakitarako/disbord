@@ -5,6 +5,7 @@ import { spawnWithDotenvx } from './dotenvxSpawn';
 import { generateMainSource, scanEventFiles } from './generate';
 import { runMigrate } from './migrate';
 import { readBotConfig } from './readBotConfig';
+import { spawnStudioProcess } from './studio';
 
 function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
@@ -14,6 +15,19 @@ async function runStartupStep(label: string, run: () => Promise<number>): Promis
   const exitCode = await run();
   if (exitCode !== 0) {
     throw new Error(`disbord: ${label}に失敗しました（終了コード ${exitCode}）`);
+  }
+}
+
+/**
+ * migrate/commands pushと違い、studioは開発の便宜のためのおまけなので失敗しても`disbord dev`自体は
+ * 継続する(runStartupStepのようにthrowしない)。ここで失敗を握りつぶして警告ログのみ出す。
+ */
+function trySpawnStudio(cwd: string): ReturnType<typeof spawnStudioProcess> | undefined {
+  try {
+    return spawnStudioProcess(cwd);
+  } catch (error) {
+    console.error(`disbord: studioの起動に失敗しました（${error instanceof Error ? error.message : error}）`);
+    return undefined;
   }
 }
 
@@ -35,6 +49,7 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
   writeFileSync(mainPath, generateMainSource(lastEventNames, { origin: 'dev', dbEnabled }));
 
   const child = spawnWithDotenvx(cwd, 'development', ['bun', '--watch', '.disbord/main.ts']);
+  const studioChild = dbEnabled ? trySpawnStudio(cwd) : undefined;
 
   const watcher = watch(eventsDir, () => {
     let eventNames: string[];
@@ -56,9 +71,12 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
     shuttingDown = true;
     watcher.close();
     const forceKill = setTimeout(() => child.kill('SIGKILL'), 3000);
+    const forceKillStudio = studioChild ? setTimeout(() => studioChild.kill('SIGKILL'), 3000) : undefined;
     child.kill(signal);
-    await child.exited;
+    studioChild?.kill(signal);
+    await Promise.all([child.exited, studioChild?.exited]);
     clearTimeout(forceKill);
+    if (forceKillStudio) clearTimeout(forceKillStudio);
     process.exit(0);
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
@@ -66,4 +84,5 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   await child.exited;
   watcher.close();
+  studioChild?.kill();
 }

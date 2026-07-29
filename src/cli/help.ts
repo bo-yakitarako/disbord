@@ -18,6 +18,11 @@ const COMMANDS: CommandHelp[] = [
     requiresDb: true,
   },
   {
+    usage: 'disbord studio',
+    description: '.disbord/dev.dbを対象にdrizzle studioサーバーを起動する',
+    requiresDb: true,
+  },
+  {
     usage: 'disbord enable db',
     description: '後からdbを有効化する',
   },
