@@ -1,3 +1,5 @@
+import type { EnvKeyType } from './envTypes';
+
 /**
  * 生成するbotが依存する`disbord`のバージョン範囲。
  * disbordを新しいバージョンで公開したら、このバージョン範囲も手動で追従させる。
@@ -227,14 +229,31 @@ export function generateCoreStub(className: string = DEFAULT_CORE_CLASS_NAME): s
  * module augmentationの受け口。db/coreClassの有効・無効状態から都度組み立て直す
  * (`disbord.d.ts`自体はユーザー編集を想定しないため、disbord.config.tsと違い
  * テキストパッチではなく毎回丸ごと再生成する。create-disbord-app初期生成時・
- * `disbord enable`・`disbord disable`のいずれもこの関数を使う)。
+ * `disbord enable`・`disbord disable`・`disbord env`のいずれもこの関数を使う)。
  */
-export function generateDisbordDts(options: { db: boolean; coreClass: boolean; coreClassName?: string }): string {
+export function generateDisbordDts(options: {
+  db: boolean;
+  coreClass: boolean;
+  coreClassName?: string;
+  envKeys?: EnvKeyType[];
+}): string {
   const coreClassName = options.coreClassName ?? DEFAULT_CORE_CLASS_NAME;
   const coreImportLine = options.coreClass ? `\nimport type { ${coreClassName} } from '@/${coreClassName}';` : '';
   const coreField = options.coreClass ? `\n    core: InstanceType<typeof ${coreClassName}>;` : '';
   const schemaImportLine = options.db ? `\nimport type { schema } from '@/db/schema';` : '';
   const schemaField = options.db ? '\n    schema: typeof schema;' : '';
+  const envKeys = options.envKeys ?? [];
+  const envBlock =
+    envKeys.length === 0
+      ? ''
+      : `\ndeclare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+${envKeys.map(({ key, required }) => `      ${key}${required ? '' : '?'}: string;`).join('\n')}
+    }
+  }
+}
+`;
 
   return `import type buttons from '@/components/buttons';
 import type selectMenus from '@/components/selectMenus';
@@ -247,7 +266,7 @@ declare module 'disbord' {
     slashCommands: typeof slashCommands;${coreField}${schemaField}
   }
 }
-`;
+${envBlock}`;
 }
 
 export function generateEnvPlaceholder(): string {

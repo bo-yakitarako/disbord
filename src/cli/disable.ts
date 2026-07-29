@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { removeConfigBlock } from './configPatch';
+import { extractCoreClassNameFromDts, regenerateDisbordDts } from './dtsRegen';
 import { readPackageJson, removeDbFromPackageJson, writePackageJson } from './packageJsonPatch';
 import { promptYesNo } from './prompt';
 import { readBotConfig } from './readBotConfig';
-import { generateDisbordDts } from './scaffold';
 
 export type DisableArgs = { target: 'db' } | { target: 'core-class' };
 
@@ -36,16 +36,6 @@ export function parseDisableArgs(args: (string | undefined)[]): DisableArgs {
   return { target };
 }
 
-function extractCoreClassNameFromDts(source: string): string | undefined {
-  const match = source.match(/^import type \{ (\w+) \} from '@\/\1';$/m);
-  return match?.[1];
-}
-
-function regenerateDts(cwd: string, db: boolean, coreClass: boolean, coreClassName: string | undefined): void {
-  mkdirSync(join(cwd, '.disbord'), { recursive: true });
-  writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
-}
-
 function disableDb(cwd: string, config: Config): void {
   const configPath = join(cwd, 'disbord.config.ts');
   writeFileSync(configPath, removeConfigBlock(readFileSync(configPath, 'utf-8'), 'db'));
@@ -59,7 +49,12 @@ function disableDb(cwd: string, config: Config): void {
   const coreClassEnabled = Boolean(config.coreClass?.enable);
   const dtsPath = join(cwd, '.disbord/disbord.d.ts');
   const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  regenerateDts(cwd, false, coreClassEnabled, coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined);
+  regenerateDisbordDts(
+    cwd,
+    false,
+    coreClassEnabled,
+    coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined,
+  );
 
   console.log('disbord: db を無効化しました');
 }
@@ -76,7 +71,7 @@ function disableCoreClass(cwd: string, config: Config): void {
     rmSync(join(cwd, `src/${coreClassName}.ts`), { force: true });
   }
 
-  regenerateDts(cwd, Boolean(config.db?.enable), false, undefined);
+  regenerateDisbordDts(cwd, Boolean(config.db?.enable), false, undefined);
 
   console.log('disbord: coreClass を無効化しました');
 }

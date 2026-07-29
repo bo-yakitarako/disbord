@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { isEncryptedContent, parseEnvArgs } from '../src/cli/env';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { isEncryptedContent, parseEnvArgs, regenerateEnvTypes } from '../src/cli/env';
+import { generateDisbordDts } from '../src/cli/scaffold';
 
 describe('parseEnvArgs', () => {
   test('引数なし時はdevelopmentにfallbackする', () => {
@@ -45,5 +49,72 @@ describe('isEncryptedContent', () => {
       'CLIENT_ID=123456789012345678',
     ].join('\n');
     expect(isEncryptedContent(decryptedButHeaderRemains)).toBe(false);
+  });
+});
+
+describe('regenerateEnvTypes', () => {
+  const BASE_CONFIG = `import type { Config } from 'disbord';
+
+export default {
+  intents: ['Guilds', 'GuildMessages'],
+  botErrorMessage: 'エラーが発生しました',
+} satisfies Config;
+`;
+
+  test('development/production両方にあるキーはrequired、片方だけのキーはoptionalとしてdisbord.d.tsに反映する', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-env-'));
+    try {
+      writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
+      mkdirSync(join(dir, '.disbord'), { recursive: true });
+      writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
+      mkdirSync(join(dir, 'env'), { recursive: true });
+      writeFileSync(join(dir, 'env/.env.development'), 'TOKEN=a\nCLIENT_ID=b\nDEV_ONLY=c\n');
+      writeFileSync(join(dir, 'env/.env.production'), 'TOKEN=a\nCLIENT_ID=b\n');
+
+      await regenerateEnvTypes(dir);
+
+      const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
+      expect(dts).toContain('namespace NodeJS');
+      expect(dts).toContain('TOKEN: string;');
+      expect(dts).toContain('CLIENT_ID: string;');
+      expect(dts).toContain('DEV_ONLY?: string;');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('既存のcoreClass/db設定を保ったまま再生成する', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-env-'));
+    try {
+      writeFileSync(
+        join(dir, 'disbord.config.ts'),
+        `import type { Config } from 'disbord';
+
+export default {
+  intents: ['Guilds', 'GuildMessages'],
+  coreClass: { enable: true, nullMessage: 'エラー' },
+  db: { enable: true },
+  botErrorMessage: 'エラーが発生しました',
+} satisfies Config;
+`,
+      );
+      mkdirSync(join(dir, '.disbord'), { recursive: true });
+      writeFileSync(
+        join(dir, '.disbord/disbord.d.ts'),
+        generateDisbordDts({ db: true, coreClass: true, coreClassName: 'Game' }),
+      );
+      mkdirSync(join(dir, 'env'), { recursive: true });
+      writeFileSync(join(dir, 'env/.env.development'), 'TOKEN=a\n');
+      writeFileSync(join(dir, 'env/.env.production'), 'TOKEN=a\n');
+
+      await regenerateEnvTypes(dir);
+
+      const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
+      expect(dts).toContain(`from '@/Game'`);
+      expect(dts).toContain(`from '@/db/schema'`);
+      expect(dts).toContain('TOKEN: string;');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

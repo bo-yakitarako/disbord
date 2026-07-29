@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { buildCoreClassConfigBlock, buildDbConfigBlock, insertConfigBlock } from './configPatch';
+import { extractCoreClassNameFromDts, regenerateDisbordDts } from './dtsRegen';
 import { addDbToPackageJson, readPackageJson, writePackageJson } from './packageJsonPatch';
 import { CORE_CLASS_NAME_PATTERN, promptCoreClassName } from './prompt';
 import { readBotConfig } from './readBotConfig';
-import { DEFAULT_CORE_CLASS_NAME, generateCoreStub, generateDisbordDts } from './scaffold';
+import { DEFAULT_CORE_CLASS_NAME, generateCoreStub } from './scaffold';
 
 export type EnableArgs = { target: 'db' } | { target: 'core-class'; name: string | undefined };
 
@@ -42,21 +43,6 @@ export function parseEnableArgs(args: (string | undefined)[]): EnableArgs {
   throw new Error(`disbord: 不明な引数 "${target}"（dbかcore-classを指定してください）`);
 }
 
-/**
- * disbord.d.tsは`disbord.config.ts`と違い都度丸ごと再生成する運用のため、既存のcore importから
- * クラス名を逆算する必要がある(dbだけをenableする際も、既にcoreClassが有効ならクラス名を
- * 保ったまま再生成しなければならない)。
- */
-function extractCoreClassNameFromDts(source: string): string | undefined {
-  const match = source.match(/^import type \{ (\w+) \} from '@\/\1';$/m);
-  return match?.[1];
-}
-
-function regenerateDts(cwd: string, db: boolean, coreClass: boolean, coreClassName: string | undefined): void {
-  mkdirSync(join(cwd, '.disbord'), { recursive: true });
-  writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
-}
-
 async function enableDb(cwd: string, config: Config): Promise<void> {
   if (config.db?.enable) {
     throw new Error('disbord: dbは既に有効です');
@@ -69,7 +55,12 @@ async function enableDb(cwd: string, config: Config): Promise<void> {
   const coreClassEnabled = Boolean(config.coreClass?.enable);
   const dtsPath = join(cwd, '.disbord/disbord.d.ts');
   const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  regenerateDts(cwd, true, coreClassEnabled, coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined);
+  regenerateDisbordDts(
+    cwd,
+    true,
+    coreClassEnabled,
+    coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined,
+  );
 
   console.log('disbord: db を有効化しました');
 }
@@ -84,7 +75,7 @@ async function enableCoreClass(cwd: string, config: Config, name: string | undef
   const configPath = join(cwd, 'disbord.config.ts');
   writeFileSync(configPath, insertConfigBlock(readFileSync(configPath, 'utf-8'), buildCoreClassConfigBlock()));
   writeFileSync(join(cwd, `src/${coreClassName}.ts`), generateCoreStub(coreClassName));
-  regenerateDts(cwd, Boolean(config.db?.enable), true, coreClassName);
+  regenerateDisbordDts(cwd, Boolean(config.db?.enable), true, coreClassName);
 
   console.log('disbord: coreClass を有効化しました');
 }

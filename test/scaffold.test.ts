@@ -135,6 +135,27 @@ describe('generateDisbordDts', () => {
     expect(source).toContain(`from '@/components/selectMenus'`);
     expect(source).toContain(`from '@/components/slashCommands'`);
   });
+
+  test('envKeys未指定・空配列時はNodeJS.ProcessEnvのaugmentationを含まない', () => {
+    expect(generateDisbordDts({ db: false, coreClass: false })).not.toContain('NodeJS');
+    expect(generateDisbordDts({ db: false, coreClass: false, envKeys: [] })).not.toContain('NodeJS');
+  });
+
+  test('envKeys指定時はrequiredをstring、optionalを`?: string`でNodeJS.ProcessEnvに反映する', () => {
+    const source = generateDisbordDts({
+      db: false,
+      coreClass: false,
+      envKeys: [
+        { key: 'TOKEN', required: true },
+        { key: 'TURSO_DATABASE_URL', required: false },
+      ],
+    });
+    expect(source).toContain('declare global {');
+    expect(source).toContain('namespace NodeJS {');
+    expect(source).toContain('interface ProcessEnv {');
+    expect(source).toContain('TOKEN: string;');
+    expect(source).toContain('TURSO_DATABASE_URL?: string;');
+  });
 });
 
 describe('その他の静的テンプレート', () => {

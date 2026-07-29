@@ -5,7 +5,10 @@ const COMMANDS: CommandHelp[] = [
   { usage: 'disbord build', description: '本番デプロイ用にdist/を生成する' },
   { usage: 'disbord commands push [--env development|production]', description: 'slashCommandをDiscordへREST登録する' },
   { usage: 'disbord commands delete [--env development|production]', description: '登録済みslashCommandを削除する' },
-  { usage: 'disbord env [--env development|production]', description: 'env/配下の環境変数を暗号化⇔復号にtoggleする' },
+  {
+    usage: 'disbord env [--env development|production]',
+    description: 'env/配下の環境変数を暗号化⇔復号にtoggleする（disbord.d.tsのprocess.env型も再生成する）',
+  },
   { usage: 'disbord generate event <name>', description: 'イベントハンドラを追加生成する' },
   {
     usage: 'disbord generate model <Name>',
