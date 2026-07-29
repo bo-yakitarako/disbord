@@ -6,6 +6,8 @@ import { generateMainSource, scanEventFiles } from './generate';
 import { readBotConfig } from './readBotConfig';
 import { regenerateSchemaFile } from './schemaGen';
 
+export const BUILD_BUNDLE_BANNER = '/* disbord | MIT License | github.com/bo-yakitarako/disbord */';
+
 export function parseBuildArgs(args: (string | undefined)[]): { external: string[] } {
   const external: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -57,6 +59,7 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
     target: 'bun',
     minify: true,
     external: [...external],
+    banner: BUILD_BUNDLE_BANNER,
   });
   if (!result.success) {
     for (const log of result.logs) {
