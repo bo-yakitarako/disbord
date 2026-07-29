@@ -24,7 +24,7 @@ describe('generatePackageJson', () => {
     expect(content.dependencies.disbord).toBe('^0.0.2');
   });
 
-  test('dev以外のnpm scripts(build/fmt/lint/gen:event/enable/disable/env/help)も含む', () => {
+  test('dev以外のnpm scripts(build/fmt/lint/gen:event/enable/disable/env/encrypt/decrypt/help)も含む', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.scripts.build).toBe('disbord build');
     expect(content.scripts.fmt).toBe('oxfmt --write src test');
@@ -33,6 +33,8 @@ describe('generatePackageJson', () => {
     expect(content.scripts.enable).toBe('disbord enable');
     expect(content.scripts.disable).toBe('disbord disable');
     expect(content.scripts.env).toBe('disbord env');
+    expect(content.scripts.encrypt).toBe('disbord env encrypt');
+    expect(content.scripts.decrypt).toBe('disbord env decrypt');
     expect(content.scripts.help).toBe('disbord help');
   });
 
@@ -41,6 +43,14 @@ describe('generatePackageJson', () => {
     const keys = Object.keys(content.scripts);
     expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:event') + 1);
     expect(keys.indexOf('disable')).toBe(keys.indexOf('enable') + 1);
+  });
+
+  test('encrypt/decryptはenvの直後、helpの直前に並ぶ', () => {
+    const content = JSON.parse(generatePackageJson('my-bot'));
+    const keys = Object.keys(content.scripts);
+    expect(keys.indexOf('encrypt')).toBe(keys.indexOf('env') + 1);
+    expect(keys.indexOf('decrypt')).toBe(keys.indexOf('encrypt') + 1);
+    expect(keys.indexOf('help')).toBe(keys.indexOf('decrypt') + 1);
   });
 
   test('db関連の依存・gen:model/migrateスクリプトは含まない(disbord enable --dbが後から追加する)', () => {

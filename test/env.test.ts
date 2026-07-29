@@ -11,16 +11,12 @@ describe('parseEnvArgs', () => {
     expect(parseEnvArgs([undefined])).toEqual({ envTarget: 'development' });
   });
 
-  test('--envでenvTargetを明示できる', () => {
-    expect(parseEnvArgs(['--env', 'production'])).toEqual({ envTarget: 'production' });
-  });
-
-  test('development/production以外の--env値はthrow', () => {
-    expect(() => parseEnvArgs(['--env', 'staging'])).toThrow();
-    expect(() => parseEnvArgs(['--env'])).toThrow();
+  test('--productionでenvTargetをproductionに固定できる', () => {
+    expect(parseEnvArgs(['--production'])).toEqual({ envTarget: 'production' });
   });
 
   test('未知の余分な引数はthrow', () => {
+    expect(() => parseEnvArgs(['--env'])).toThrow();
     expect(() => parseEnvArgs(['--force'])).toThrow();
     expect(() => parseEnvArgs(['push'])).toThrow();
   });

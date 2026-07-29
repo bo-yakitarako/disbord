@@ -31,6 +31,8 @@ export function generatePackageJson(name: string): string {
           enable: 'disbord enable',
           disable: 'disbord disable',
           env: 'disbord env',
+          encrypt: 'disbord env encrypt',
+          decrypt: 'disbord env decrypt',
           help: 'disbord help',
         },
         dependencies: {

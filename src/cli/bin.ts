@@ -4,7 +4,7 @@ import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
 import { parseDisableArgs, runDisable } from './disable';
 import { parseEnableArgs, runEnable } from './enable';
-import { parseEnvArgs, runEnvToggle } from './env';
+import { parseEnvArgs, runEnvAction, runEnvToggle } from './env';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
 import { buildHelpText } from './help';
@@ -28,6 +28,8 @@ const IMPLEMENTED_COMMANDS = [
   'commands push',
   'commands delete',
   'env',
+  'env encrypt',
+  'env decrypt',
   'generate event',
   'generate model',
   'migrate',
@@ -68,6 +70,10 @@ async function dispatch(): Promise<number> {
   }
 
   if (command === 'env') {
+    if (sub === 'encrypt' || sub === 'decrypt') {
+      const { envTarget } = parseEnvArgs(rest);
+      return runEnvAction(sub, envTarget, process.cwd());
+    }
     const { envTarget } = parseEnvArgs([sub, ...rest]);
     return runEnvToggle(envTarget, process.cwd());
   }
@@ -109,6 +115,8 @@ async function dispatch(): Promise<number> {
     'dev',
     'build',
     'env',
+    'env encrypt',
+    'env decrypt',
     'commands push',
     'commands delete',
     'generate event',

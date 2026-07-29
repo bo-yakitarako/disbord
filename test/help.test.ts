@@ -10,6 +10,8 @@ describe('buildHelpText', () => {
       'disbord commands push',
       'disbord commands delete',
       'disbord env',
+      'disbord env encrypt',
+      'disbord env decrypt',
       'disbord generate event <name>',
       'disbord generate model <Name>',
       'disbord migrate',
