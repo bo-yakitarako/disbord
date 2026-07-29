@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { buildCoreClassConfigBlock, buildDbConfigBlock, insertConfigBlock } from './configPatch';
+import { applyCoreParamRewrite, toCamelCase } from './coreParamCodemod';
 import { regenerateDisbordDts } from './dtsRegen';
 import { addDbToPackageJson, readPackageJson, writePackageJson } from './packageJsonPatch';
 import { CORE_CLASS_NAME_PATTERN, promptCoreClassName } from './prompt';
@@ -71,6 +72,11 @@ async function enableCoreClass(cwd: string, config: Config, name: string | undef
   );
   writeFileSync(join(cwd, `src/${coreClassName}.ts`), generateCoreStub(coreClassName));
   regenerateDisbordDts(cwd, Boolean(config.db?.enable), true, coreClassName);
+
+  // 既存のbutton/selectMenuのexecuteに第2引数(core)を挿入する。挿入しないと有効化後にcoreを
+  // 使おうとしたコード側の型は合っても、既存entryはinteractionの次にrest argsが来る古い並びの
+  // ままズレてしまう(ButtonRegistration/SelectMenuRegistrationのexecute引数のズレ対策)。
+  applyCoreParamRewrite(cwd, { mode: 'insert', paramName: toCamelCase(coreClassName) });
 
   console.log('disbord: coreClass を有効化しました');
 }

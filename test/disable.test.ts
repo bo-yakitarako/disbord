@@ -31,9 +31,16 @@ beforeEach(async () => {
     ) + '\n',
   );
   writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
-  mkdirSync(join(dir, 'src'), { recursive: true });
+  mkdirSync(join(dir, 'src/components'), { recursive: true });
   mkdirSync(join(dir, '.disbord'), { recursive: true });
   writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
+  writeFileSync(
+    join(dir, 'src/components/buttons.ts'),
+    `export default {
+  sample: { component: { label: 'x' }, async execute(interaction) { await interaction.reply('x'); } },
+} satisfies ButtonRegistration;
+`,
+  );
 
   await runEnable(dir, { target: 'db' });
   await runEnable(dir, { target: 'core-class', name: 'Game' });
@@ -132,6 +139,19 @@ describe('runDisable', () => {
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).not.toContain('Game');
     expect(dts).toContain(`from '@/db/schema'`);
+  });
+
+  test('coreClassを無効化すると、有効化時に挿入されたbuttons.tsのgame引数が除去される(引数ズレ対策)', async () => {
+    // beforeEachのcore-class有効化時点でgameパラメータが挿入済みであることの前提確認
+    expect(readFileSync(join(dir, 'src/components/buttons.ts'), 'utf-8')).toContain(
+      'async execute(interaction, game) {',
+    );
+
+    await runDisable(dir, { target: 'core-class' }, () => true);
+
+    const buttons = readFileSync(join(dir, 'src/components/buttons.ts'), 'utf-8');
+    expect(buttons).toContain('async execute(interaction) {');
+    expect(buttons).not.toContain('game');
   });
 
   test('有効になっていない機能を指定するとthrow', async () => {

@@ -2,6 +2,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { removeConfigBlock } from './configPatch';
+import { applyCoreParamRewrite } from './coreParamCodemod';
 import { regenerateDisbordDts } from './dtsRegen';
 import { readPackageJson, removeDbFromPackageJson, writePackageJson } from './packageJsonPatch';
 import { promptYesNo } from './prompt';
@@ -62,6 +63,9 @@ function disableCoreClass(cwd: string, config: Config): void {
   }
 
   regenerateDisbordDts(cwd, Boolean(config.db?.enable), false, undefined);
+
+  // 有効化時に挿入したcore引数を除去し、既存button/selectMenuのexecuteの引数ズレを防ぐ。
+  applyCoreParamRewrite(cwd, { mode: 'remove' });
 
   console.log('disbord: coreClass を無効化しました');
 }

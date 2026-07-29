@@ -30,9 +30,22 @@ beforeEach(() => {
     ) + '\n',
   );
   writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
-  mkdirSync(join(dir, 'src'), { recursive: true });
+  mkdirSync(join(dir, 'src/components'), { recursive: true });
   mkdirSync(join(dir, '.disbord'), { recursive: true });
   writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
+  writeFileSync(
+    join(dir, 'src/components/buttons.ts'),
+    `export default {
+  sample: { component: { label: 'x' }, async execute(interaction) { await interaction.reply('x'); } },
+  args: { component: { label: 'y' }, async execute(interaction, ...args) { await interaction.reply('y'); } },
+} satisfies ButtonRegistration;
+`,
+  );
+  writeFileSync(
+    join(dir, 'src/components/selectMenus.ts'),
+    `export default {} satisfies SelectMenuRegistration;
+`,
+  );
 });
 
 afterEach(() => {
@@ -101,6 +114,14 @@ describe('runEnable', () => {
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).toContain(`from '@/Game'`);
     expect(dts).toContain('core: InstanceType<typeof Game>;');
+  });
+
+  test('core-class有効化時、既存のbuttons.tsのexecuteにclassNameのcamelCase名(第2引数)を挿入する(引数ズレ対策)', async () => {
+    await runEnable(dir, { target: 'core-class', name: 'Game' });
+
+    const buttons = readFileSync(join(dir, 'src/components/buttons.ts'), 'utf-8');
+    expect(buttons).toContain('async execute(interaction, game) {');
+    expect(buttons).toContain('async execute(interaction, game, ...args) {');
   });
 
   test('db→core-classの順で2回有効化すると、その呼び出し順(いずれもbotErrorMessageの直前に挿入)でconfigに並ぶ', async () => {
