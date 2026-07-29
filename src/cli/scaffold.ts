@@ -8,6 +8,19 @@ import type { EnvKeyType } from './envTypes';
 const DISBORD_VERSION_RANGE = '^0.0.2';
 
 /**
+ * 生成するbotが使うbunのバージョン(mise.toml/`@types/bun`両方で使う)。
+ * disbordリポジトリ自身のmise.toml（ルート直下、disbord/create-disbord-appのworkspace共通）が
+ * 固定しているbunバージョンと同じ値に手動で追従させる。
+ */
+const BUN_VERSION = '1.3.13';
+
+/**
+ * 生成するbotが使うoxlintのバージョン(oxfmtと同様、`latest`ではなく固定バージョンで指定する)。
+ * oxlintの新しいバージョンをdisbord/create-disbord-app側で追従させたら、この値も手動で追従させる。
+ */
+const OXLINT_VERSION_RANGE = '^1.76.0';
+
+/**
  * `create-disbord-app`が生成する初期スケルトンのうち、`--db`/`--core-class`に依存しない
  * base package.json(依存・scriptsの追加は`disbord enable db`が担う。「オプションの生成処理は
  * 全てdisbord enableから行う」構成のため、この関数自体はdbを一切知らない)。
@@ -40,11 +53,11 @@ export function generatePackageJson(name: string): string {
           'discord.js': '^14.27.0',
         },
         devDependencies: {
-          '@types/bun': 'latest',
+          '@types/bun': BUN_VERSION,
           // typescript@7系のtscは既にネイティブ実装への薄いシムになっているため、
           // @typescript/native-preview(tsgoコマンド)は不要(実機確認済み)。
           typescript: '^7.0.2',
-          oxlint: 'latest',
+          oxlint: OXLINT_VERSION_RANGE,
           oxfmt: '^0.61.0',
         },
       },
@@ -178,9 +191,10 @@ export function generateTsconfig(): string {
 
 export function generateMiseToml(): string {
   // dotenvxはdisbordのnpm依存(@dotenvx/dotenvx)から解決するため、bot側でmise経由の
-  // dotenvx導入は不要。
+  // dotenvx導入は不要。bunは`latest`ではなくBUN_VERSION固定(package.jsonの`@types/bun`と
+  // 同じバージョンに揃えるため)。
   return `[tools]
-bun = "latest"
+bun = "${BUN_VERSION}"
 `;
 }
 

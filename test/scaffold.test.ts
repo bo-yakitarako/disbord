@@ -67,6 +67,17 @@ describe('generatePackageJson', () => {
     expect(content.devDependencies['@typescript/native-preview']).toBeUndefined();
     expect(content.devDependencies.typescript).toBeDefined();
   });
+
+  test('@types/bun・oxlintは`latest`ではなく固定バージョン(@types/bunはgenerateMiseTomlのbunバージョンと一致、oxlintはoxfmtと同じ指定方法)', () => {
+    const content = JSON.parse(generatePackageJson('my-bot'));
+    const miseToml = generateMiseToml();
+    const bunVersionMatch = /bun = "([^"]+)"/.exec(miseToml);
+    expect(bunVersionMatch).not.toBeNull();
+    expect(content.devDependencies['@types/bun']).toBe(bunVersionMatch?.[1]);
+    expect(content.devDependencies['@types/bun']).not.toBe('latest');
+    expect(content.devDependencies.oxlint).not.toBe('latest');
+    expect(content.devDependencies.oxlint).toMatch(/^\^\d+\.\d+\.\d+$/);
+  });
 });
 
 describe('generateDisbordConfig', () => {
@@ -215,5 +226,10 @@ describe('その他の静的テンプレート', () => {
     const content = generateMiseToml();
     expect(content).toContain('bun =');
     expect(content).not.toContain('dotenvx');
+  });
+
+  test('generateMiseToml: bunは`latest`ではなく固定バージョン', () => {
+    const content = generateMiseToml();
+    expect(content).not.toContain('"latest"');
   });
 });
