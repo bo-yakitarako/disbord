@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import dayjs, { type Dayjs } from 'dayjs';
-import { Model } from '../src/db/Model';
 import {
   Column,
   CompoundIndex,
@@ -12,6 +11,7 @@ import {
   Unique,
   type ModelClass,
 } from '../src/db/decorators';
+import { Model } from '../src/db/Model';
 
 @Table('users')
 class User extends Model<User.Data> {
@@ -101,7 +101,15 @@ describe('decorators', () => {
     const user = new User({ id: 'u1', createdAt: now, updatedAt: now, email: 'a@example.com', name: 'Taro' });
     expect(user.email).toBe('a@example.com');
 
-    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    const job = new Job({
+      id: 'j1',
+      createdAt: now,
+      updatedAt: now,
+      userId: 'u1',
+      scheduledAt: now,
+      slug: 's',
+      name: 'n',
+    });
     expect(job.userId).toBe('u1');
   });
 
@@ -114,13 +122,29 @@ describe('decorators', () => {
   });
 
   test('mode: timestamp_msのカラムはgetter越しにdayjsでラップされる', () => {
-    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    const job = new Job({
+      id: 'j1',
+      createdAt: now,
+      updatedAt: now,
+      userId: 'u1',
+      scheduledAt: now,
+      slug: 's',
+      name: 'n',
+    });
     expect(dayjs.isDayjs(job.scheduledAt)).toBe(true);
     expect(job.scheduledAt.valueOf()).toBe(now.valueOf());
   });
 
   test('Model本体のcreatedAt/updatedAtもdayjsでラップされる', () => {
-    const job = new Job({ id: 'j1', createdAt: now, updatedAt: now, userId: 'u1', scheduledAt: now, slug: 's', name: 'n' });
+    const job = new Job({
+      id: 'j1',
+      createdAt: now,
+      updatedAt: now,
+      userId: 'u1',
+      scheduledAt: now,
+      slug: 's',
+      name: 'n',
+    });
     expect(dayjs.isDayjs(job.createdAt)).toBe(true);
     expect(dayjs.isDayjs(job.updatedAt)).toBe(true);
   });

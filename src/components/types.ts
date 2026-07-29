@@ -1,3 +1,4 @@
+import type { RegistryOf } from '../registry';
 import type { ButtonInteraction, ChatInputCommandInteraction, StringSelectMenuInteraction } from './interaction';
 
 export type ButtonStyleName = 'primary' | 'secondary' | 'success' | 'danger';
@@ -32,14 +33,20 @@ type ExecuteWithCore<TCore, Interaction> = [TCore] extends [never]
   ? (interaction: Interaction, ...args: string[]) => Promise<void>
   : (interaction: Interaction, core: TCore, ...args: string[]) => Promise<void>;
 
-export type ButtonRegistration<TCore = never> = {
+/**
+ * Registry['core']がsrc/disbord.d.tsのmodule augmentationで定義されていれば(--core-class時)、
+ * TCoreを明示しなくてもsrc/Core.tsの型が自動で流れ込む。未定義ならneverのまま(coreなし)。
+ */
+type DefaultCore = RegistryOf<'core', never>;
+
+export type ButtonRegistration<TCore = DefaultCore> = {
   [key: string]: {
     component: ButtonComponent | ((...args: any[]) => ButtonComponent);
     execute: ExecuteWithCore<TCore, ButtonInteraction>;
   };
 };
 
-export type SelectMenuRegistration<TCore = never> = {
+export type SelectMenuRegistration<TCore = DefaultCore> = {
   [key: string]: {
     component: SelectMenuComponent | ((...args: any[]) => SelectMenuComponent);
     execute: ExecuteWithCore<TCore, StringSelectMenuInteraction>;

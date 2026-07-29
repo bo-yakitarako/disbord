@@ -49,14 +49,19 @@ function push<T>(metadata: MetadataBag, key: symbol, entry: T): void {
   list.push(entry);
 }
 
-function dataGetter(property: string, options: { dayjs?: boolean } = {}): { get(this: any): any; set(this: any): void } {
+function dataGetter(
+  property: string,
+  options: { dayjs?: boolean } = {},
+): { get(this: any): any; set(this: any): void } {
   return {
     get(this: any) {
       const value = this._data[property];
       return options.dayjs && value != null ? dayjs(value) : value;
     },
     set(this: any) {
-      throw new Error(`disbord: ${property} は読み取り専用です。値を変更するには Model の set()/update() を使ってください`);
+      throw new Error(
+        `disbord: ${property} は読み取り専用です。値を変更するには Model の set()/update() を使ってください`,
+      );
     },
   };
 }

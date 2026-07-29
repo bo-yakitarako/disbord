@@ -1,12 +1,6 @@
 import { relations } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
-import {
-  readModelMeta,
-  type ColumnMeta,
-  type ModelClass,
-  type ModelMeta,
-  type RelateMeta,
-} from './decorators';
+import { readModelMeta, type ColumnMeta, type ModelClass, type ModelMeta, type RelateMeta } from './decorators';
 
 export type { ModelClass } from './decorators';
 
@@ -33,7 +27,9 @@ function createColumnBuilder(dbName: string, colMeta: ColumnMeta): any {
   }
   if (options.default !== undefined) {
     builder =
-      typeof options.default === 'function' ? builder.$defaultFn(options.default as () => unknown) : builder.default(options.default);
+      typeof options.default === 'function'
+        ? builder.$defaultFn(options.default as () => unknown)
+        : builder.default(options.default);
   }
   return builder;
 }
@@ -42,7 +38,11 @@ function collectColumnDefs(meta: ModelMeta): Map<string, ColumnMeta> {
   const defs = new Map(meta.columns.map((column) => [column.property, column] as const));
   for (const relate of meta.relates) {
     if (!defs.has(relate.property)) {
-      defs.set(relate.property, { property: relate.property, type: 'text', options: { nullable: relate.options.nullable } });
+      defs.set(relate.property, {
+        property: relate.property,
+        type: 'text',
+        options: { nullable: relate.options.nullable },
+      });
     }
   }
   return defs;

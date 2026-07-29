@@ -1,6 +1,6 @@
-import type { Client } from '@libsql/client';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Client } from '@libsql/client';
 
 const TRACKING_TABLE = '__disbord_migrations';
 

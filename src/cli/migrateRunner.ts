@@ -1,7 +1,7 @@
-import { createClient } from '@libsql/client';
-import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createClient } from '@libsql/client';
+import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { buildSchema } from '../db/buildSchema';
 import { applyPendingMigrations } from '../db/migrationRunner';
 import { readBotConfig } from './readBotConfig';

@@ -1,8 +1,8 @@
-import { createClient } from '@libsql/client';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createClient } from '@libsql/client';
 import { applyPendingMigrations } from '../src/db/migrationRunner';
 
 let dir: string;
@@ -18,10 +18,7 @@ afterEach(() => {
 describe('applyPendingMigrations', () => {
   test('migrationsディレクトリ内の.sqlをファイル名昇順に適用する', async () => {
     writeFileSync(join(dir, '20260101000000.sql'), 'CREATE TABLE users (id text PRIMARY KEY);');
-    writeFileSync(
-      join(dir, '20260102000000.sql'),
-      'CREATE TABLE jobs (id text PRIMARY KEY);',
-    );
+    writeFileSync(join(dir, '20260102000000.sql'), 'CREATE TABLE jobs (id text PRIMARY KEY);');
 
     const client = createClient({ url: ':memory:' });
     const applied = await applyPendingMigrations(client, dir);
