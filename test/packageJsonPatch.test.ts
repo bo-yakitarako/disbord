@@ -17,9 +17,10 @@ function basePkg(): PackageJsonLike {
 }
 
 describe('addDbToPackageJson', () => {
-  test('migrateスクリプトをhelpの直前に挿入する', () => {
+  test('gen:model・migrateスクリプトをこの順でhelpの直前に挿入する', () => {
     const result = addDbToPackageJson(basePkg());
-    expect(Object.keys(result.scripts!)).toEqual(['dev', 'env', 'migrate', 'help']);
+    expect(Object.keys(result.scripts!)).toEqual(['dev', 'env', 'gen:model', 'migrate', 'help']);
+    expect(result.scripts!['gen:model']).toBe('disbord generate model');
     expect(result.scripts!.migrate).toBe('disbord migrate');
   });
 
@@ -39,7 +40,7 @@ describe('addDbToPackageJson', () => {
 });
 
 describe('removeDbFromPackageJson', () => {
-  test('addDbToPackageJsonした内容を元に戻す(migrateスクリプトとdb依存を除去)', () => {
+  test('addDbToPackageJsonした内容を元に戻す(gen:model・migrateスクリプトとdb依存を除去)', () => {
     const withDb = addDbToPackageJson(basePkg());
     const result = removeDbFromPackageJson(withDb);
     expect(result.scripts).toEqual(basePkg().scripts);

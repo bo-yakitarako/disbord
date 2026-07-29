@@ -32,7 +32,8 @@ beforeEach(async () => {
   );
   writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
   mkdirSync(join(dir, 'src'), { recursive: true });
-  writeFileSync(join(dir, 'src/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
+  mkdirSync(join(dir, '.disbord'), { recursive: true });
+  writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
 
   await runEnable(dir, { target: 'db' });
   await runEnable(dir, { target: 'core-class', name: 'Game' });
@@ -42,7 +43,6 @@ beforeEach(async () => {
   writeFileSync(join(dir, 'src/db/schema.ts'), '// schema');
   mkdirSync(join(dir, 'migrations'), { recursive: true });
   writeFileSync(join(dir, 'migrations/20260101000000.sql'), '-- sql');
-  mkdirSync(join(dir, '.disbord'), { recursive: true });
   writeFileSync(join(dir, '.disbord/dev.db'), '');
 });
 
@@ -114,7 +114,7 @@ describe('runDisable', () => {
     expect(pkg.scripts.migrate).toBeUndefined();
     expect(pkg.dependencies['@libsql/client']).toBeUndefined();
 
-    const dts = readFileSync(join(dir, 'src/disbord.d.ts'), 'utf-8');
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).not.toContain('schema');
     expect(dts).toContain(`from '@/Game'`);
   });
@@ -129,7 +129,7 @@ describe('runDisable', () => {
     expect(existsSync(join(dir, 'src/Game.ts'))).toBe(false);
     expect(existsSync(join(dir, 'src/db/models'))).toBe(true);
 
-    const dts = readFileSync(join(dir, 'src/disbord.d.ts'), 'utf-8');
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).not.toContain('Game');
     expect(dts).toContain(`from '@/db/schema'`);
   });

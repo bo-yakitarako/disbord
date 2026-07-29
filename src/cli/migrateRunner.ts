@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { createClient } from '@libsql/client';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { buildSchema } from '../db/buildSchema';
+import { readModelMeta } from '../db/decorators';
 import { applyPendingMigrations } from '../db/migrationRunner';
+import { buildDataTypeLiteral, renderDataBlock, withDataBlock } from './modelDataBlock';
 import { readBotConfig } from './readBotConfig';
 import { scanModelFiles, type ScannedModel } from './scanModelFiles';
 
@@ -13,6 +15,35 @@ function timestampId(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+/**
+ * 各モデルファイル末尾の`namespace Xxx { export type Data = ... }`を、現在の@Column/@Relate
+ * メタデータから再生成して書き戻す。TypeScriptのnamespace-classマージが同一ファイル内でしか
+ * 成立しないため、disbord.d.ts側ではなくモデルファイル自身をここで書き換える（modelDataBlock.ts参照）。
+ */
+function rewriteModelDataBlocks(modelsDir: string, models: ScannedModel[]): void {
+  const modelsByFile = new Map<string, ScannedModel[]>();
+  for (const model of models) {
+    const fileModels = modelsByFile.get(model.fileName) ?? [];
+    fileModels.push(model);
+    modelsByFile.set(model.fileName, fileModels);
+  }
+
+  for (const [fileName, fileModels] of modelsByFile) {
+    const filePath = join(modelsDir, `${fileName}.ts`);
+    const block = renderDataBlock(
+      fileModels.map((model) => ({
+        exportName: model.exportName,
+        typeLiteral: buildDataTypeLiteral(readModelMeta(model.modelClass)),
+      })),
+    );
+    const source = readFileSync(filePath, 'utf-8');
+    const next = withDataBlock(source, block);
+    if (next !== source) {
+      writeFileSync(filePath, next);
+    }
+  }
 }
 
 function generateSchemaSource(models: ScannedModel[]): string {
@@ -32,6 +63,7 @@ async function runDevMigrate(cwd: string): Promise<void> {
   const snapshotPath = join(migrationsDir, '_snapshot.json');
 
   const models = await scanModelFiles(modelsDir);
+  rewriteModelDataBlocks(modelsDir, models);
   writeFileSync(join(cwd, 'src/db/schema.ts'), generateSchemaSource(models));
 
   const schema = buildSchema(models.map((m) => m.modelClass));

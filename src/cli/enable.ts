@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { buildCoreClassConfigBlock, buildDbConfigBlock, insertConfigBlock } from './configPatch';
@@ -53,7 +53,8 @@ function extractCoreClassNameFromDts(source: string): string | undefined {
 }
 
 function regenerateDts(cwd: string, db: boolean, coreClass: boolean, coreClassName: string | undefined): void {
-  writeFileSync(join(cwd, 'src/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
+  mkdirSync(join(cwd, '.disbord'), { recursive: true });
+  writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
 }
 
 async function enableDb(cwd: string, config: Config): Promise<void> {
@@ -66,7 +67,7 @@ async function enableDb(cwd: string, config: Config): Promise<void> {
   writePackageJson(cwd, addDbToPackageJson(readPackageJson(cwd)));
 
   const coreClassEnabled = Boolean(config.coreClass?.enable);
-  const dtsPath = join(cwd, 'src/disbord.d.ts');
+  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
   const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
   regenerateDts(cwd, true, coreClassEnabled, coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined);
 

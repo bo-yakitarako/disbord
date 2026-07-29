@@ -3,3 +3,4 @@ dist
 .disbord
 *.tsbuildinfo
 .DS_Store
+test/.tmp-*

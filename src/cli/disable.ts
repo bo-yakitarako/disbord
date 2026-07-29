@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { removeConfigBlock } from './configPatch';
@@ -42,7 +42,8 @@ function extractCoreClassNameFromDts(source: string): string | undefined {
 }
 
 function regenerateDts(cwd: string, db: boolean, coreClass: boolean, coreClassName: string | undefined): void {
-  writeFileSync(join(cwd, 'src/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
+  mkdirSync(join(cwd, '.disbord'), { recursive: true });
+  writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName }));
 }
 
 function disableDb(cwd: string, config: Config): void {
@@ -56,7 +57,7 @@ function disableDb(cwd: string, config: Config): void {
   rmSync(join(cwd, '.disbord/dev.db'), { force: true });
 
   const coreClassEnabled = Boolean(config.coreClass?.enable);
-  const dtsPath = join(cwd, 'src/disbord.d.ts');
+  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
   const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
   regenerateDts(cwd, false, coreClassEnabled, coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined);
 
@@ -64,7 +65,7 @@ function disableDb(cwd: string, config: Config): void {
 }
 
 function disableCoreClass(cwd: string, config: Config): void {
-  const dtsPath = join(cwd, 'src/disbord.d.ts');
+  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
   const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
   const coreClassName = extractCoreClassNameFromDts(existingDts);
 

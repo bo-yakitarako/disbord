@@ -34,7 +34,7 @@ type ExecuteWithCore<TCore, Interaction> = [TCore] extends [never]
   : (interaction: Interaction, core: TCore, ...args: string[]) => Promise<void>;
 
 /**
- * Registry['core']がsrc/disbord.d.tsのmodule augmentationで定義されていれば(--core-class時)、
+ * Registry['core']が.disbord/disbord.d.tsのmodule augmentationで定義されていれば(--core-class時)、
  * TCoreを明示しなくてもsrc/Core.tsの型が自動で流れ込む。未定義ならneverのまま(coreなし)。
  */
 type DefaultCore = RegistryOf<'core', never>;

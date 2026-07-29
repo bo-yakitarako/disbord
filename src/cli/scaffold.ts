@@ -25,7 +25,6 @@ export function generatePackageJson(name: string): string {
           commands: 'disbord commands push',
           'commands:delete': 'disbord commands delete',
           'gen:event': 'disbord generate event',
-          'gen:model': 'disbord generate model',
           enable: 'disbord enable',
           disable: 'disbord disable',
           env: 'disbord env',
@@ -71,6 +70,7 @@ export const DB_DEPENDENCIES: Record<string, string> = {
   'drizzle-orm': '^0.45.1',
 };
 
+export const DB_GEN_MODEL_SCRIPT = { name: 'gen:model', command: 'disbord generate model' } as const;
 export const DB_MIGRATE_SCRIPT = { name: 'migrate', command: 'disbord migrate' } as const;
 
 /**
@@ -155,7 +155,7 @@ export function generateTsconfig(): string {
           noUncheckedIndexedAccess: true,
           noImplicitOverride: true,
         },
-        include: ['src', 'test'],
+        include: ['src', 'test', '.disbord/disbord.d.ts'],
       },
       null,
       2,

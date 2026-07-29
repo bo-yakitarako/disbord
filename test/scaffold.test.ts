@@ -24,31 +24,31 @@ describe('generatePackageJson', () => {
     expect(content.dependencies.disbord).toBe('^0.0.2');
   });
 
-  test('dev以外のnpm scripts(build/fmt/lint/gen:event/gen:model/enable/disable/env/help)も含む', () => {
+  test('dev以外のnpm scripts(build/fmt/lint/gen:event/enable/disable/env/help)も含む', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.scripts.build).toBe('disbord build');
     expect(content.scripts.fmt).toBe('oxfmt --write src test');
     expect(content.scripts.lint).toBe('oxlint -c oxlint.config.ts --fix');
     expect(content.scripts['gen:event']).toBe('disbord generate event');
-    expect(content.scripts['gen:model']).toBe('disbord generate model');
     expect(content.scripts.enable).toBe('disbord enable');
     expect(content.scripts.disable).toBe('disbord disable');
     expect(content.scripts.env).toBe('disbord env');
     expect(content.scripts.help).toBe('disbord help');
   });
 
-  test('enable/disableはgen:modelの直後に並ぶ', () => {
+  test('enable/disableはgen:eventの直後に並ぶ', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     const keys = Object.keys(content.scripts);
-    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:model') + 1);
+    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:event') + 1);
     expect(keys.indexOf('disable')).toBe(keys.indexOf('enable') + 1);
   });
 
-  test('db関連の依存・migrateスクリプトは含まない(disbord enable --dbが後から追加する)', () => {
+  test('db関連の依存・gen:model/migrateスクリプトは含まない(disbord enable --dbが後から追加する)', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.dependencies['@libsql/client']).toBeUndefined();
     expect(content.dependencies.dayjs).toBeUndefined();
     expect(content.dependencies['drizzle-orm']).toBeUndefined();
+    expect(content.scripts['gen:model']).toBeUndefined();
     expect(content.scripts.migrate).toBeUndefined();
   });
 

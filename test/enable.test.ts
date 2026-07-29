@@ -31,7 +31,8 @@ beforeEach(() => {
   );
   writeFileSync(join(dir, 'disbord.config.ts'), BASE_CONFIG);
   mkdirSync(join(dir, 'src'), { recursive: true });
-  writeFileSync(join(dir, 'src/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
+  mkdirSync(join(dir, '.disbord'), { recursive: true });
+  writeFileSync(join(dir, '.disbord/disbord.d.ts'), generateDisbordDts({ db: false, coreClass: false }));
 });
 
 afterEach(() => {
@@ -84,7 +85,7 @@ describe('runEnable', () => {
     expect(pkg.scripts.migrate).toBe('disbord migrate');
     expect(pkg.dependencies['@libsql/client']).toBe('^0.17.2');
 
-    const dts = readFileSync(join(dir, 'src/disbord.d.ts'), 'utf-8');
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).toContain(`from '@/db/schema'`);
   });
 
@@ -97,7 +98,7 @@ describe('runEnable', () => {
     const config = readFileSync(join(dir, 'disbord.config.ts'), 'utf-8');
     expect(config).toContain('coreClass: {');
 
-    const dts = readFileSync(join(dir, 'src/disbord.d.ts'), 'utf-8');
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).toContain(`from '@/Game'`);
     expect(dts).toContain('core: InstanceType<typeof Game>;');
   });
@@ -113,7 +114,7 @@ describe('runEnable', () => {
     expect(dbIndex).toBeLessThan(coreClassIndex);
     expect(coreClassIndex).toBeLessThan(botErrorMessageIndex);
 
-    const dts = readFileSync(join(dir, 'src/disbord.d.ts'), 'utf-8');
+    const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).toContain(`from '@/db/schema'`);
     expect(dts).toContain(`from '@/Game'`);
   });
