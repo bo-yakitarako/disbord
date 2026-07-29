@@ -53,10 +53,14 @@ export type SelectMenuRegistration<TCore = DefaultCore> = {
   };
 };
 
+export type SlashCommandExecute = (interaction: ChatInputCommandInteraction, ...args: string[]) => Promise<void>;
+
 export type SlashCommandRegistration = {
-  [key: string]: {
-    description?: string;
-    options?: SlashCommandOption[];
-    execute(interaction: ChatInputCommandInteraction, ...args: string[]): Promise<void>;
-  };
+  [key: string]:
+    | SlashCommandExecute
+    | {
+        description?: string;
+        options?: SlashCommandOption[];
+        execute: SlashCommandExecute;
+      };
 };

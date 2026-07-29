@@ -21,6 +21,9 @@ function addOption(builder: SlashCommandBuilder, option: SlashCommandOption) {
 }
 
 function buildSlashCommandData(key: string, def: SlashCommandRegistration[string]) {
+  if (typeof def === 'function') {
+    return new SlashCommandBuilder().setName(key).setDescription(key);
+  }
   const builder = new SlashCommandBuilder().setName(key).setDescription(def.description ?? key);
   for (const option of def.options ?? []) {
     addOption(builder, option);
@@ -43,5 +46,6 @@ export async function routeSlashCommandInteraction(
   if (!entry) {
     throw new Error(`disbord: unknown slash command "${interaction.commandName}"`);
   }
-  await entry.execute(wrapped);
+  const execute = typeof entry === 'function' ? entry : entry.execute;
+  await execute(wrapped);
 }
