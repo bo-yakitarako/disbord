@@ -63,7 +63,7 @@ describe('generateMainSource', () => {
 
   test('setComponentsStateはcomponentsの動的import直後・Client生成より前に呼ばれる', () => {
     const source = generateMainSource([]);
-    expect(source).toContain('setComponentsState({ buttons, selectMenus });');
+    expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
     const importsIdx = source.indexOf(`await import('../src/components/slashCommands')`);
     const setStateIdx = source.indexOf('setComponentsState(');
     const clientIdx = source.indexOf('new Client(');
@@ -75,7 +75,7 @@ describe('generateMainSource', () => {
     for (const origin of ['dev', 'build'] as const) {
       for (const dbEnabled of [true, false]) {
         const source = generateMainSource([], { origin, dbEnabled });
-        expect(source).toContain('setComponentsState({ buttons, selectMenus });');
+        expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
       }
     }
   });
@@ -88,10 +88,17 @@ describe('generateMainSource', () => {
 
   test('coreOptionはbutton/selectMenuルーティングにのみ渡り、slashCommandには渡らない', () => {
     const source = generateMainSource([]);
-    expect(source).toContain('routeButtonInteraction(interaction, buttons, coreOption as never)');
-    expect(source).toContain('routeSelectMenuInteraction(interaction, selectMenus, coreOption as never)');
+    expect(source).toContain(
+      'routeButtonInteraction(interaction, buttons, coreOption as never, { argsSplitter: config.argsSplitter });',
+    );
+    expect(source).toContain('routeSelectMenuInteraction(interaction, selectMenus, coreOption as never, {');
     expect(source).toContain('routeSlashCommandInteraction(interaction, slashCommands)');
     expect(source).not.toContain('routeSlashCommandInteraction(interaction, slashCommands, coreOption');
+  });
+
+  test('button/selectMenuルーティングにはargsSplitterがconfigから渡る', () => {
+    const source = generateMainSource([]);
+    expect(source).toContain('argsSplitter: config.argsSplitter');
   });
 
   test('tokenの環境変数名はconfig未指定時にTOKENへfallbackする', () => {

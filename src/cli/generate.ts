@@ -65,7 +65,7 @@ async function main() {
 ${dbInit}  const buttons = (await import('../src/components/buttons')).default;
   const selectMenus = (await import('../src/components/selectMenus')).default;
   const slashCommands = (await import('../src/components/slashCommands')).default;
-  setComponentsState({ buttons, selectMenus });
+  setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });
 
   const client = new Client({ intents: config.intents });
 
@@ -80,9 +80,11 @@ ${dbInit}  const buttons = (await import('../src/components/buttons')).default;
       if (interaction.isChatInputCommand()) {
         await routeSlashCommandInteraction(interaction, slashCommands);
       } else if (interaction.isButton()) {
-        await routeButtonInteraction(interaction, buttons, coreOption as never);
+        await routeButtonInteraction(interaction, buttons, coreOption as never, { argsSplitter: config.argsSplitter });
       } else if (interaction.isStringSelectMenu()) {
-        await routeSelectMenuInteraction(interaction, selectMenus, coreOption as never);
+        await routeSelectMenuInteraction(interaction, selectMenus, coreOption as never, {
+          argsSplitter: config.argsSplitter,
+        });
       }
     } catch (error) {
       await handleBotError(error, interaction, config.botErrorMessage);

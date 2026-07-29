@@ -20,6 +20,7 @@ export type SelectMenuOption = {
 export type SelectMenuComponent = {
   placeholder?: string;
   options: SelectMenuOption[];
+  args?: (string | number)[];
 };
 
 export type SlashCommandOption = {
@@ -43,6 +44,7 @@ export type ButtonRegistration<TCore = DefaultCore> = {
   [key: string]: {
     component: ButtonComponent | ((...args: any[]) => ButtonComponent);
     execute: ExecuteWithCore<TCore, ButtonInteraction>;
+    argsSplitter?: string;
   };
 };
 
@@ -50,6 +52,7 @@ export type SelectMenuRegistration<TCore = DefaultCore> = {
   [key: string]: {
     component: SelectMenuComponent | ((...args: any[]) => SelectMenuComponent);
     execute: ExecuteWithCore<TCore, StringSelectMenuInteraction>;
+    argsSplitter?: string;
   };
 };
 

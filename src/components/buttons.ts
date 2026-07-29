@@ -6,7 +6,7 @@ import {
 } from 'discord.js';
 import type { CoreStore } from '../core/store';
 import type { RegistryOf } from '../registry';
-import { buildCustomId, parseCustomId } from './customId';
+import { buildCustomId, matchCustomId } from './customId';
 import { wrapButtonInteraction } from './interaction';
 import { getComponentsState } from './state';
 import type { ButtonComponent, ButtonRegistration, ButtonStyleName } from './types';
@@ -18,9 +18,9 @@ const buttonStyleMap: Record<ButtonStyleName, ButtonStyle> = {
   danger: ButtonStyle.Danger,
 };
 
-function buildButtonComponent(key: string, spec: ButtonComponent): ButtonBuilder {
+function buildButtonComponent(key: string, spec: ButtonComponent, separator: string): ButtonBuilder {
   const builder = new ButtonBuilder()
-    .setCustomId(buildCustomId(key, spec.args))
+    .setCustomId(buildCustomId(key, spec.args, separator))
     .setLabel(spec.label)
     .setStyle(buttonStyleMap[spec.style ?? 'secondary']);
   if (spec.disabled) {
@@ -36,6 +36,7 @@ type ButtonRowItem<R extends ButtonRegistration<any>> = {
 function buildButtonRow<R extends ButtonRegistration<any>>(
   registration: R,
   items: ButtonRowItem<R>[],
+  globalSplitter: string | undefined,
 ): ActionRowBuilder<ButtonBuilder> {
   const buttons = items.map((item) => {
     const [key, ...args] = (Array.isArray(item) ? item : [item]) as [keyof R, ...unknown[]];
@@ -44,7 +45,7 @@ function buildButtonRow<R extends ButtonRegistration<any>>(
       typeof entry.component === 'function'
         ? (entry.component as (...a: unknown[]) => ButtonComponent)(...args)
         : entry.component;
-    return buildButtonComponent(key as string, spec);
+    return buildButtonComponent(key as string, spec, entry.argsSplitter ?? globalSplitter ?? '-');
   });
   return new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
 }
@@ -52,7 +53,8 @@ function buildButtonRow<R extends ButtonRegistration<any>>(
 type Registration = RegistryOf<'buttons', ButtonRegistration<any>>;
 
 export function makeButtonRow(...items: ButtonRowItem<Registration>[]): ActionRowBuilder<ButtonBuilder> {
-  return buildButtonRow(getComponentsState().buttons as Registration, items);
+  const state = getComponentsState();
+  return buildButtonRow(state.buttons as Registration, items, state.argsSplitter);
 }
 
 type CoreOption<TCore> = { store: CoreStore<TCore>; nullMessage: string };
@@ -61,13 +63,15 @@ export async function routeButtonInteraction<TCore>(
   interaction: DiscordButtonInteraction,
   registration: ButtonRegistration<TCore>,
   core?: CoreOption<TCore>,
+  options?: { argsSplitter?: string },
 ): Promise<void> {
   const wrapped = wrapButtonInteraction(interaction);
-  const [key, ...args] = parseCustomId(interaction.customId);
-  const entry = registration[key];
-  if (!entry) {
+  const matched = matchCustomId(interaction.customId, registration, options?.argsSplitter);
+  if (!matched) {
     throw new Error(`disbord: unknown button customId "${interaction.customId}"`);
   }
+  const [key, args] = matched;
+  const entry = registration[key]!;
   if (core) {
     const instance = core.store.get(interaction);
     if (instance === null) {

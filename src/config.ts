@@ -18,4 +18,5 @@ export type Config = {
     tursoAuthToken?: string;
   };
   botErrorMessage: BotErrorMessage;
+  argsSplitter?: string;
 };
