@@ -14,6 +14,13 @@ export default {
 } satisfies Config;
 `;
 
+describe('buildCoreClassConfigBlock', () => {
+  test('classNameをdisbord.config.ts自身に埋め込む(.disbord/削除時にも復元できるよう永続化するため)', () => {
+    const block = buildCoreClassConfigBlock('Game');
+    expect(block).toContain(`className: 'Game',`);
+  });
+});
+
 describe('insertConfigBlock', () => {
   test('botErrorMessageの直前にブロックを挿入する', () => {
     const result = insertConfigBlock(BASE_CONFIG, buildDbConfigBlock());
@@ -21,7 +28,7 @@ describe('insertConfigBlock', () => {
   });
 
   test('coreClass→dbの順で挿入すると、テンプレの並び順(intents→coreClass→db→botErrorMessage)通りになる', () => {
-    let result = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock());
+    let result = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock('Game'));
     result = insertConfigBlock(result, buildDbConfigBlock());
 
     const coreClassIndex = result.indexOf('coreClass:');
@@ -39,7 +46,7 @@ describe('insertConfigBlock', () => {
 
 describe('removeConfigBlock', () => {
   test('coreClassブロックを丸ごと除去する', () => {
-    const withCoreClass = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock());
+    const withCoreClass = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock('Game'));
     const result = removeConfigBlock(withCoreClass, 'coreClass');
     expect(result).toBe(BASE_CONFIG);
   });
@@ -51,7 +58,7 @@ describe('removeConfigBlock', () => {
   });
 
   test('coreClass/db両方入っている場合、片方だけ除去してももう片方は残る', () => {
-    let source = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock());
+    let source = insertConfigBlock(BASE_CONFIG, buildCoreClassConfigBlock('Game'));
     source = insertConfigBlock(source, buildDbConfigBlock());
 
     const result = removeConfigBlock(source, 'coreClass');

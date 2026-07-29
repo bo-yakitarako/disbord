@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { buildCoreClassConfigBlock, buildDbConfigBlock, insertConfigBlock } from './configPatch';
-import { extractCoreClassNameFromDts, regenerateDisbordDts } from './dtsRegen';
+import { regenerateDisbordDts } from './dtsRegen';
 import { addDbToPackageJson, readPackageJson, writePackageJson } from './packageJsonPatch';
 import { CORE_CLASS_NAME_PATTERN, promptCoreClassName } from './prompt';
 import { readBotConfig } from './readBotConfig';
@@ -52,15 +52,7 @@ async function enableDb(cwd: string, config: Config): Promise<void> {
   writeFileSync(configPath, insertConfigBlock(readFileSync(configPath, 'utf-8'), buildDbConfigBlock()));
   writePackageJson(cwd, addDbToPackageJson(readPackageJson(cwd)));
 
-  const coreClassEnabled = Boolean(config.coreClass?.enable);
-  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
-  const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  regenerateDisbordDts(
-    cwd,
-    true,
-    coreClassEnabled,
-    coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined,
-  );
+  regenerateDisbordDts(cwd, true, Boolean(config.coreClass?.enable), config.coreClass?.className);
 
   console.log('disbord: db を有効化しました');
 }
@@ -73,7 +65,10 @@ async function enableCoreClass(cwd: string, config: Config, name: string | undef
   const coreClassName = name ?? promptCoreClassName(DEFAULT_CORE_CLASS_NAME);
 
   const configPath = join(cwd, 'disbord.config.ts');
-  writeFileSync(configPath, insertConfigBlock(readFileSync(configPath, 'utf-8'), buildCoreClassConfigBlock()));
+  writeFileSync(
+    configPath,
+    insertConfigBlock(readFileSync(configPath, 'utf-8'), buildCoreClassConfigBlock(coreClassName)),
+  );
   writeFileSync(join(cwd, `src/${coreClassName}.ts`), generateCoreStub(coreClassName));
   regenerateDisbordDts(cwd, Boolean(config.db?.enable), true, coreClassName);
 

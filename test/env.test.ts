@@ -83,21 +83,20 @@ export default {
     }
   });
 
-  test('既存のcoreClass/db設定を保ったまま再生成する', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'disbord-env-'));
-    try {
-      writeFileSync(
-        join(dir, 'disbord.config.ts'),
-        `import type { Config } from 'disbord';
+  const CONFIG_WITH_CORE_CLASS_AND_DB = `import type { Config } from 'disbord';
 
 export default {
   intents: ['Guilds', 'GuildMessages'],
-  coreClass: { enable: true, nullMessage: 'エラー' },
+  coreClass: { enable: true, className: 'Game', nullMessage: 'エラー' },
   db: { enable: true },
   botErrorMessage: 'エラーが発生しました',
 } satisfies Config;
-`,
-      );
+`;
+
+  test('既存のcoreClass/db設定(className含む)を保ったまま再生成する', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-env-'));
+    try {
+      writeFileSync(join(dir, 'disbord.config.ts'), CONFIG_WITH_CORE_CLASS_AND_DB);
       mkdirSync(join(dir, '.disbord'), { recursive: true });
       writeFileSync(
         join(dir, '.disbord/disbord.d.ts'),
@@ -106,6 +105,26 @@ export default {
       mkdirSync(join(dir, 'env'), { recursive: true });
       writeFileSync(join(dir, 'env/.env.development'), 'TOKEN=a\n');
       writeFileSync(join(dir, 'env/.env.production'), 'TOKEN=a\n');
+
+      await regenerateEnvTypes(dir);
+
+      const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
+      expect(dts).toContain(`from '@/Game'`);
+      expect(dts).toContain(`from '@/db/schema'`);
+      expect(dts).toContain('TOKEN: string;');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('.disbord/ごと削除されていても、disbord.config.ts(className含む)とenv/だけから正しく再生成できる', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-env-'));
+    try {
+      writeFileSync(join(dir, 'disbord.config.ts'), CONFIG_WITH_CORE_CLASS_AND_DB);
+      mkdirSync(join(dir, 'env'), { recursive: true });
+      writeFileSync(join(dir, 'env/.env.development'), 'TOKEN=a\n');
+      writeFileSync(join(dir, 'env/.env.production'), 'TOKEN=a\n');
+      // .disbord/自体を意図的に作らない(disbord.d.tsの過去の内容に一切依存しないことを確認する)
 
       await regenerateEnvTypes(dir);
 

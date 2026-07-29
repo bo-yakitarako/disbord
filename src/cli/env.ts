@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvx, type EnvTarget } from './dotenvxSpawn';
-import { extractCoreClassNameFromDts, regenerateDisbordDts } from './dtsRegen';
+import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { readBotConfig } from './readBotConfig';
 
 export function parseEnvArgs(args: (string | undefined)[]): { envTarget: EnvTarget } {
@@ -34,16 +34,7 @@ export function isEncryptedContent(content: string): boolean {
  * disbord.d.tsのprocess.env型（NodeJS.ProcessEnv augmentation）も併せて最新化する。
  */
 export async function regenerateEnvTypes(cwd: string): Promise<void> {
-  const config = await readBotConfig(cwd);
-  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
-  const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  const coreClassEnabled = Boolean(config.coreClass?.enable);
-  regenerateDisbordDts(
-    cwd,
-    Boolean(config.db?.enable),
-    coreClassEnabled,
-    coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined,
-  );
+  regenerateDisbordDtsFromConfig(cwd, await readBotConfig(cwd));
 }
 
 export async function runEnvToggle(envTarget: EnvTarget, cwd: string): Promise<number> {

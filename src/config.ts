@@ -9,6 +9,7 @@ export type Config = {
   intents: ClientOptions['intents'];
   coreClass?: {
     enable: true;
+    className: string;
     nullMessage: string;
     instanceLevel?: InstanceLevel;
   };

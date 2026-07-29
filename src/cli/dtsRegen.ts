@@ -1,22 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Config } from '../config';
 import { collectEnvKeyTypes } from './envTypes';
 import { generateDisbordDts } from './scaffold';
 
 /**
- * disbord.d.tsは`disbord.config.ts`と違い都度丸ごと再生成する運用のため、既存のcore importから
- * クラス名を逆算する必要がある(dbだけをenable/disableする際も、既にcoreClassが有効ならクラス名を
- * 保ったまま再生成しなければならない)。
- */
-export function extractCoreClassNameFromDts(source: string): string | undefined {
-  const match = source.match(/^import type \{ (\w+) \} from '@\/\1';$/m);
-  return match?.[1];
-}
-
-/**
- * `disbord enable`/`disable`/`env`のいずれからも呼ばれる共通の再生成処理。
- * env/配下のキー一覧は呼び出しの都度読み直す(disbord.config.tsと違いここも
- * ユーザー編集を想定しないため、db/coreClassの状態と同様に毎回最新化する)。
+ * `disbord enable`/`disable`/`env`/`dev`/`build`のいずれからも呼ばれる共通の再生成処理。
+ * `.disbord/`ごと削除されても`disbord.config.ts`（className含む）とenv/配下だけから
+ * 完全に再構築できることが前提のため、既存の`.disbord/disbord.d.ts`は一切参照しない。
+ * env/配下のキー一覧は呼び出しの都度読み直す(disbord.config.tsと違いここもユーザー編集を
+ * 想定しないため、db/coreClassの状態と同様に毎回最新化する)。
  */
 export function regenerateDisbordDts(
   cwd: string,
@@ -27,4 +20,14 @@ export function regenerateDisbordDts(
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
   const envKeys = collectEnvKeyTypes(cwd);
   writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName, envKeys }));
+}
+
+/**
+ * `disbord.config.ts`を読み込み済みで、その内容がそのまま現在の状態を表す呼び出し元
+ * （`dev`/`build`/`env`）向けの薄いラッパー。`enable`/`disable`は今まさに書き換え中の
+ * 状態（旧`config`にはまだ反映されていないdb/coreClassの新しい有効状態）を扱うため、
+ * こちらではなく`regenerateDisbordDts`を直接使う。
+ */
+export function regenerateDisbordDtsFromConfig(cwd: string, config: Config): void {
+  regenerateDisbordDts(cwd, Boolean(config.db?.enable), Boolean(config.coreClass?.enable), config.coreClass?.className);
 }

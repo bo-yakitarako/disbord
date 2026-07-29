@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
+import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { generateMainSource, scanEventFiles } from './generate';
 import { readBotConfig } from './readBotConfig';
 
@@ -29,6 +30,10 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
+
+  // dev.tsと同様、`.disbord/`ごと削除されていてもbuild単体でdisbord.d.tsを再構築できるようにする。
+  regenerateDisbordDtsFromConfig(cwd, config);
+
   writeFileSync(join(cwd, '.disbord/main.ts'), generateMainSource(eventNames, { origin: 'build', dbEnabled }));
 
   const external = new Set(options.external ?? []);

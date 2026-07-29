@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { removeConfigBlock } from './configPatch';
-import { extractCoreClassNameFromDts, regenerateDisbordDts } from './dtsRegen';
+import { regenerateDisbordDts } from './dtsRegen';
 import { readPackageJson, removeDbFromPackageJson, writePackageJson } from './packageJsonPatch';
 import { promptYesNo } from './prompt';
 import { readBotConfig } from './readBotConfig';
@@ -46,23 +46,13 @@ function disableDb(cwd: string, config: Config): void {
   rmSync(join(cwd, 'migrations'), { recursive: true, force: true });
   rmSync(join(cwd, '.disbord/dev.db'), { force: true });
 
-  const coreClassEnabled = Boolean(config.coreClass?.enable);
-  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
-  const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  regenerateDisbordDts(
-    cwd,
-    false,
-    coreClassEnabled,
-    coreClassEnabled ? extractCoreClassNameFromDts(existingDts) : undefined,
-  );
+  regenerateDisbordDts(cwd, false, Boolean(config.coreClass?.enable), config.coreClass?.className);
 
   console.log('disbord: db を無効化しました');
 }
 
 function disableCoreClass(cwd: string, config: Config): void {
-  const dtsPath = join(cwd, '.disbord/disbord.d.ts');
-  const existingDts = existsSync(dtsPath) ? readFileSync(dtsPath, 'utf-8') : '';
-  const coreClassName = extractCoreClassNameFromDts(existingDts);
+  const coreClassName = config.coreClass?.className;
 
   const configPath = join(cwd, 'disbord.config.ts');
   writeFileSync(configPath, removeConfigBlock(readFileSync(configPath, 'utf-8'), 'coreClass'));

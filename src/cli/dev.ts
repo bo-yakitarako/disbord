@@ -2,6 +2,7 @@ import { mkdirSync, watch, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCommands } from './commands';
 import { spawnWithDotenvx } from './dotenvxSpawn';
+import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { generateMainSource, scanEventFiles } from './generate';
 import { runMigrate } from './migrate';
 import { readBotConfig } from './readBotConfig';
@@ -39,6 +40,11 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
+
+  // `.disbord/`ごと削除されていても`disbord.config.ts`/env/配下だけからdisbord.d.tsを
+  // 完全に再構築できるようにする(`disbord enable`/`disable`/`env`を手動実行しなくても
+  // 開発を始められるようにするため)。
+  regenerateDisbordDtsFromConfig(cwd, config);
 
   await runStartupStep('slashCommandの登録(commands push)', () => runCommands('push', 'development', cwd));
   if (dbEnabled) {

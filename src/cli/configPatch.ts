@@ -6,8 +6,13 @@
 
 const CORE_CLASS_NULL_MESSAGE = 'まだ始まっていません';
 
-export function buildCoreClassConfigBlock(): string {
-  return `  coreClass: {\n    enable: true,\n    nullMessage: '${CORE_CLASS_NULL_MESSAGE}',\n  },\n`;
+/**
+ * `className`はここで`disbord.config.ts`自身に埋め込んで永続化する。`.disbord/disbord.d.ts`から
+ * 逆算する方式だと`.disbord/`ごと削除された際にクラス名を復元できなくなるため
+ * （dev/buildがdisbord.d.tsを都度再生成する際の唯一の情報源にする。dtsRegen.ts参照）。
+ */
+export function buildCoreClassConfigBlock(className: string): string {
+  return `  coreClass: {\n    enable: true,\n    className: '${className}',\n    nullMessage: '${CORE_CLASS_NULL_MESSAGE}',\n  },\n`;
 }
 
 export function buildDbConfigBlock(): string {
