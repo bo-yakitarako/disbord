@@ -17,6 +17,22 @@ const COMMANDS: CommandHelp[] = [
     description: 'モデル定義からschema.ts・migrationファイルを生成し、DBに適用する',
     requiresDb: true,
   },
+  {
+    usage: 'disbord enable db',
+    description: '後からdbを有効化する',
+  },
+  {
+    usage: 'disbord enable core-class [ClassName]',
+    description: '後からcoreClassを有効化する（ClassName省略時は対話で名前を聞く）',
+  },
+  {
+    usage: 'disbord disable db',
+    description: '有効化したdbを無効化する（確認プロンプトあり）',
+  },
+  {
+    usage: 'disbord disable core-class',
+    description: '有効化したcoreClassを無効化する（確認プロンプトあり）',
+  },
 ];
 
 export type BuildHelpTextOptions = { dbEnabled: boolean };

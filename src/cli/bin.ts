@@ -2,6 +2,8 @@
 import { parseBuildArgs, runBuild } from './build';
 import { parseCommandsArgs, runCommands } from './commands';
 import { runDev } from './dev';
+import { parseDisableArgs, runDisable } from './disable';
+import { parseEnableArgs, runEnable } from './enable';
 import { parseEnvArgs, runEnvToggle } from './env';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
@@ -28,6 +30,8 @@ const IMPLEMENTED_COMMANDS = [
   'generate event',
   'generate model',
   'migrate',
+  'enable',
+  'disable',
 ];
 
 // oxlint-disable-next-line complexity
@@ -83,6 +87,18 @@ async function dispatch(): Promise<number> {
     return runMigrate(production, process.cwd());
   }
 
+  if (command === 'enable') {
+    const args = parseEnableArgs([sub, ...rest]);
+    await runEnable(process.cwd(), args);
+    return 0;
+  }
+
+  if (command === 'disable') {
+    const args = parseDisableArgs([sub, ...rest]);
+    await runDisable(process.cwd(), args);
+    return 0;
+  }
+
   const known = [
     'dev',
     'build',
@@ -92,6 +108,8 @@ async function dispatch(): Promise<number> {
     'generate event',
     'generate model',
     'migrate',
+    'enable',
+    'disable',
   ];
   const label = command ?? '(no command)';
   throw new Error(

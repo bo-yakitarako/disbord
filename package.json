@@ -8,7 +8,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./lint": "./src/lint/index.ts"
+    "./lint": "./src/lint/index.ts",
+    "./scaffold": "./src/cli/scaffold.ts",
+    "./prompt": "./src/cli/prompt.ts"
   },
   "bin": {
     "disbord": "./src/cli/bin.ts"
