@@ -5,6 +5,9 @@
   "license": "MIT",
   "author": "bo-yakitarako",
   "repository": "github:bo-yakitarako/disbord",
+  "bin": {
+    "disbord": "./src/cli/bin.ts"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -13,12 +16,9 @@
     "./prompt": "./src/cli/prompt.ts",
     "./utils": "./src/utils.ts"
   },
-  "bin": {
-    "disbord": "./src/cli/bin.ts"
-  },
   "scripts": {
     "test": "bun test",
-    "lint": "oxlint -c oxlint.config.ts --fix && oxfmt --write src test",
+    "lint": "oxfmt --write src test && oxlint -c oxlint.config.ts --fix",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
