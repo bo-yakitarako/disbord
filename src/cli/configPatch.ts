@@ -5,6 +5,7 @@
  */
 
 const CORE_CLASS_NULL_MESSAGE = 'まだ始まっていません';
+const CORE_CLASS_INSTANCE_INVALID_MESSAGE = 'このコマンドはここでは使えません';
 
 /**
  * `className`はここで`disbord.config.ts`自身に埋め込んで永続化する。`.disbord/disbord.d.ts`から
@@ -12,7 +13,7 @@ const CORE_CLASS_NULL_MESSAGE = 'まだ始まっていません';
  * （dev/buildがdisbord.d.tsを都度再生成する際の唯一の情報源にする。dtsRegen.ts参照）。
  */
 export function buildCoreClassConfigBlock(className: string): string {
-  return `  coreClass: {\n    enable: true,\n    className: '${className}',\n    nullMessage: '${CORE_CLASS_NULL_MESSAGE}',\n  },\n`;
+  return `  coreClass: {\n    enable: true,\n    className: '${className}',\n    nullMessage: '${CORE_CLASS_NULL_MESSAGE}',\n    instanceInvalidMessage: '${CORE_CLASS_INSTANCE_INVALID_MESSAGE}',\n  },\n`;
 }
 
 export function buildDbConfigBlock(): string {

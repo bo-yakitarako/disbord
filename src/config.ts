@@ -11,6 +11,7 @@ export type Config = {
     enable: true;
     className: string;
     nullMessage: string;
+    instanceInvalidMessage: string;
     instanceLevel?: InstanceLevel;
   };
   db?: {

@@ -12,7 +12,7 @@ export async function handleBotError(
   if (!(error instanceof BotError)) {
     throw error;
   }
-  const content = typeof botErrorMessage === 'function' ? botErrorMessage(error) : botErrorMessage;
+  const content = error.message || (typeof botErrorMessage === 'function' ? botErrorMessage(error) : botErrorMessage);
   if (interaction.deferred || interaction.replied) {
     await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
     return;

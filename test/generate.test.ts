@@ -101,6 +101,26 @@ describe('generateMainSource', () => {
     expect(source).toContain('argsSplitter: config.argsSplitter');
   });
 
+  test('coreClassName未指定時はCoreクラスのimport・factory呼び出しを一切含まない', () => {
+    const source = generateMainSource([]);
+    expect(source).not.toContain("from '../src/");
+    expect(source).toContain("createCoreStore(config.coreClass.instanceLevel ?? 'guild')");
+  });
+
+  test('coreClassName指定時は実クラスをimportし、createCoreStoreへfactoryとinstanceInvalidMessageを渡す(bot側でnew Coreを書かずに済む)', () => {
+    const source = generateMainSource([], { coreClassName: 'Core' });
+    expect(source).toContain("import { Core } from '../src/Core';");
+    expect(source).toContain(
+      "createCoreStore(config.coreClass.instanceLevel ?? 'guild', () => new Core(), config.coreClass.instanceInvalidMessage)",
+    );
+  });
+
+  test('coreClassName指定時のimportはClassName別名(--core-classでカスタム名にした場合)にも対応する', () => {
+    const source = generateMainSource([], { coreClassName: 'GameMaster' });
+    expect(source).toContain("import { GameMaster } from '../src/GameMaster';");
+    expect(source).toContain('() => new GameMaster()');
+  });
+
   test('tokenの環境変数名はconfig未指定時にTOKENへfallbackする', () => {
     const source = generateMainSource([]);
     expect(source).toContain(`process.env[config.token ?? 'TOKEN']`);

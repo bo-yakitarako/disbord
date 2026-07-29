@@ -1,5 +1,6 @@
 export { BotError, handleBotError, type BotErrorMessage } from './BotError';
 export type { Config, InstanceLevel } from './config';
+export { coreStore } from './core/coreStore';
 export { createCoreStore, resolveInstanceKey, type CoreStore } from './core/store';
 export { db } from './db/db';
 export { createDbClient } from './db/client';

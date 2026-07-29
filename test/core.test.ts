@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { RepliableInteraction } from 'discord.js';
+import { BotError } from '../src/BotError';
 import { createCoreStore, resolveInstanceKey } from '../src/core/store';
 
 function fakeInteraction(overrides: {
@@ -54,20 +55,30 @@ describe('resolveInstanceKey', () => {
 });
 
 describe('createCoreStore', () => {
-  test('createしたインスタンスをgetで取得できる', () => {
-    const store = createCoreStore<{ hello(): string }>('channel');
-    const interaction = fakeInteraction({ channelId: 'channel-1' });
+  test('createしたインスタンス(factoryが返す値)をgetで取得できる', () => {
     const instance = { hello: () => 'はろー' };
+    const store = createCoreStore<{ hello(): string }>('channel', () => instance, 'ここでは使えません');
+    const interaction = fakeInteraction({ channelId: 'channel-1' });
 
     expect(store.get(interaction)).toBeNull();
-    expect(store.create(interaction, instance)).toBe(instance);
+    expect(store.create(interaction)).toBe(instance);
     expect(store.get(interaction)).toBe(instance);
   });
 
+  test('createのたびにfactoryが呼ばれ、新しいインスタンスに置き換わる', () => {
+    let constructedCount = 0;
+    const store = createCoreStore<{ id: number }>('channel', () => ({ id: ++constructedCount }), 'ここでは使えません');
+    const interaction = fakeInteraction({ channelId: 'channel-factory' });
+
+    expect(store.create(interaction)).toEqual({ id: 1 });
+    expect(store.create(interaction)).toEqual({ id: 2 });
+    expect(store.get(interaction)).toEqual({ id: 2 });
+  });
+
   test('removeするとgetがnullを返す', () => {
-    const store = createCoreStore<{ value: number }>('channel');
+    const store = createCoreStore<{ value: number }>('channel', () => ({ value: 1 }), 'ここでは使えません');
     const interaction = fakeInteraction({ channelId: 'channel-2' });
-    store.create(interaction, { value: 1 });
+    store.create(interaction);
 
     store.remove(interaction);
 
@@ -75,21 +86,34 @@ describe('createCoreStore', () => {
   });
 
   test('別々のキー(channelId違い)は独立して保持される', () => {
-    const store = createCoreStore<{ value: number }>('channel');
+    let constructedCount = 0;
+    const store = createCoreStore<{ value: number }>(
+      'channel',
+      () => ({ value: ++constructedCount }),
+      'ここでは使えません',
+    );
     const a = fakeInteraction({ channelId: 'channel-a' });
     const b = fakeInteraction({ channelId: 'channel-b' });
-    store.create(a, { value: 1 });
-    store.create(b, { value: 2 });
+    store.create(a);
+    store.create(b);
 
     expect(store.get(a)).toEqual({ value: 1 });
     expect(store.get(b)).toEqual({ value: 2 });
   });
 
-  test('キーが解決できない場合createはnullを返し保存しない', () => {
-    const store = createCoreStore<{ value: number }>('guild');
+  test('キーが解決できない場合createはBotError(instanceInvalidMessage)をthrowし保存しない(非同期処理も構築失敗もないため、createの成功時の戻り値はnull unionを持たずTのみで確定できる)', () => {
+    const store = createCoreStore<{ value: number }>('guild', () => ({ value: 1 }), 'ギルド専用だよ');
     const interaction = fakeInteraction({ guildId: null });
 
-    expect(store.create(interaction, { value: 1 })).toBeNull();
+    expect(() => store.create(interaction)).toThrow(BotError);
+    expect(() => store.create(interaction)).toThrow('ギルド専用だよ');
     expect(store.get(interaction)).toBeNull();
+  });
+
+  test('factory/instanceInvalidMessageがない場合createはthrowする(coreClass.enable無効時にコード上createCoreStoreを直接呼ぶような誤用への防御)', () => {
+    const store = createCoreStore<{ id: string }>('channel');
+    const interaction = fakeInteraction({ channelId: 'channel-no-factory' });
+
+    expect(() => store.create(interaction)).toThrow();
   });
 });

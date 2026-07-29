@@ -52,7 +52,7 @@ describe('regenerateDisbordDtsFromConfig', () => {
     try {
       const config: Config = {
         ...BASE,
-        coreClass: { enable: true, className: 'Game', nullMessage: 'エラー' },
+        coreClass: { enable: true, className: 'Game', nullMessage: 'エラー', instanceInvalidMessage: 'エラー' },
         db: { enable: true },
       };
 

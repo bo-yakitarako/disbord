@@ -40,6 +40,7 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
+  const coreClassName = config.coreClass?.enable ? config.coreClass.className : undefined;
 
   // `.disbord/`ごと削除されていても`disbord.config.ts`/env/配下だけからdisbord.d.tsを
   // 完全に再構築できるようにする(`disbord enable`/`disable`/`env`を手動実行しなくても
@@ -52,7 +53,7 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
   }
 
   let lastEventNames = scanEventFiles(eventsDir);
-  writeFileSync(mainPath, generateMainSource(lastEventNames, { origin: 'dev', dbEnabled }));
+  writeFileSync(mainPath, generateMainSource(lastEventNames, { origin: 'dev', dbEnabled, coreClassName }));
 
   const child = spawnWithDotenvx(cwd, 'development', ['bun', '--watch', '.disbord/main.ts']);
   const studioChild = dbEnabled ? trySpawnStudio(cwd) : undefined;
@@ -67,7 +68,7 @@ export async function runDev(cwd: string = process.cwd()): Promise<void> {
     }
     if (arraysEqual(eventNames, lastEventNames)) return;
     lastEventNames = eventNames;
-    writeFileSync(mainPath, generateMainSource(eventNames, { origin: 'dev', dbEnabled }));
+    writeFileSync(mainPath, generateMainSource(eventNames, { origin: 'dev', dbEnabled, coreClassName }));
     console.log('disbord: src/events/ の構成が変わったため .disbord/main.ts を再生成しました');
   });
 

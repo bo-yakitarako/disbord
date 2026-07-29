@@ -30,11 +30,15 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
+  const coreClassName = config.coreClass?.enable ? config.coreClass.className : undefined;
 
   // dev.tsと同様、`.disbord/`ごと削除されていてもbuild単体でdisbord.d.tsを再構築できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
 
-  writeFileSync(join(cwd, '.disbord/main.ts'), generateMainSource(eventNames, { origin: 'build', dbEnabled }));
+  writeFileSync(
+    join(cwd, '.disbord/main.ts'),
+    generateMainSource(eventNames, { origin: 'build', dbEnabled, coreClassName }),
+  );
 
   const external = new Set(options.external ?? []);
   if (dbEnabled) {
