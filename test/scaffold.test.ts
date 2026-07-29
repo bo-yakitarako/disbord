@@ -23,7 +23,7 @@ describe('generatePackageJson', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.name).toBe('my-bot');
     expect(content.scripts.dev).toBe('disbord dev');
-    expect(content.dependencies.disbord).toBe('^0.0.2');
+    expect(content.dependencies.disbord).toBe('^1.0.0');
   });
 
   test('dev以外のnpm scripts(build/fmt/lint/gen:event/enable/disable/env/encrypt/decrypt/help)も含む', () => {
