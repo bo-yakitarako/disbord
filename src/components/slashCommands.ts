@@ -17,6 +17,10 @@ function addOption(builder: SlashCommandBuilder, option: SlashCommandOption) {
     builder.addNumberOption((o) => o.setName(option.name).setDescription(description).setRequired(required));
     return;
   }
+  if (option.type === 'integer') {
+    builder.addIntegerOption((o) => o.setName(option.name).setDescription(description).setRequired(required));
+    return;
+  }
   builder.addBooleanOption((o) => o.setName(option.name).setDescription(description).setRequired(required));
 }
 

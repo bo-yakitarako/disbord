@@ -24,7 +24,7 @@ export type SelectMenuComponent = {
 };
 
 export type SlashCommandOption = {
-  type: 'number' | 'string' | 'boolean';
+  type: 'number' | 'integer' | 'string' | 'boolean';
   name: string;
   description?: string;
   required?: boolean;

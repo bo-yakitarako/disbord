@@ -75,6 +75,27 @@ describe('collectSlashCommandsData', () => {
       options: [],
     });
   });
+
+  test('optionのtypeがdiscord.jsのApplicationCommandOptionTypeの値に正しくマッピングされる(number: 10, integer: 4はinteraction.options.getInteger()/getNumber()の型検証で区別される値のため取り違えるとthrowする)', () => {
+    const registration: SlashCommandRegistration = {
+      test: {
+        options: [
+          { type: 'string', name: 'str' },
+          { type: 'number', name: 'num' },
+          { type: 'integer', name: 'int' },
+          { type: 'boolean', name: 'bool' },
+        ],
+        execute: async () => {},
+      },
+    };
+    const data = collectSlashCommandsData(registration);
+    const options = data.find((c) => c.name === 'test')!.options!;
+    const typeOf = (name: string) => options.find((o) => o.name === name)!.type;
+    expect(typeOf('str')).toBe(3);
+    expect(typeOf('num')).toBe(10);
+    expect(typeOf('int')).toBe(4);
+    expect(typeOf('bool')).toBe(5);
+  });
 });
 
 describe('routeSlashCommandInteraction', () => {
