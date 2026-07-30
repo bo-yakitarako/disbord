@@ -26,10 +26,9 @@ export type GenerateOnceMainSourceOptions = {
 
 /**
  * `.disbord/once/<name>.ts`（`disbord once`/`disbord build`が生成する実実行ファイル）のソース。
- * `.disbord/main.ts`（generate.ts）と違い常駐しない: readyイベントの最後に`client.destroy()`を
- * 呼んで1回で終了する。生成先が`.disbord/once/`（1階層深い）ため相対importの深さが
- * `.disbord/main.ts`と異なる点に注意（disbord.config.ts/src/配下は`../../`、
- * schema.tsのみ`.disbord/db/`配下で`../`）。
+ * bot本体のように常駐せず、readyイベントの最後に`client.destroy()`を呼んで1回で終了する。
+ * 生成先が`.disbord/once/`（1階層深い）ため相対importの深さに注意
+ * （disbord.config.ts/src/配下は`../../`、schema.tsのみ`.disbord/db/`配下で`../`）。
  */
 export function generateOnceMainSource(name: string, options: GenerateOnceMainSourceOptions = {}): string {
   const origin = options.origin ?? 'once';

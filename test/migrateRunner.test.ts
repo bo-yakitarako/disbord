@@ -1,0 +1,54 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { generateSQLiteDrizzleJson } from 'drizzle-kit/api';
+import { runDevMigrate } from '../src/cli/migrateRunner';
+import { scanModelFiles } from '../src/cli/scanModelFiles';
+import { buildSchema } from '../src/db/buildSchema';
+
+const DISBORD_INDEX = join(import.meta.dir, '..', 'src/index.ts');
+
+function modelSource(withExtraColumn: boolean): string {
+  const extra = withExtraColumn ? `\n\n  @Column('text')\n  accessor extra!: string;` : '';
+  return (
+    `import { Table, Column } from '${DISBORD_INDEX}';\n\n` +
+    `@Table('jobs')\nexport class Job {\n  @Column('text')\n  accessor sample!: string;${extra}\n}\n`
+  );
+}
+
+let dir: string;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'disbord-migrate-runner-'));
+  mkdirSync(join(dir, 'src/db/models'), { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe('runDevMigrate', () => {
+  test('既存テーブルへNOT NULLかつdefault未設定のカラムを追加するmigrationはthrowし、ファイルを書き出さない(実際に踏んだ不具合の再現)', async () => {
+    // 前回のdisbord migrateで書き出された想定のsnapshot(sampleカラムのみ)を用意する。
+    // Bunの動的importは同一パスを一度importするとキャッシュし続ける(readBotConfig.ts参照)ため、
+    // 本番で実際にscanするsrc/db/models/Job.tsとは別パスに置いてimportし、キャッシュ衝突を避ける。
+    mkdirSync(join(dir, '_base-models'), { recursive: true });
+    writeFileSync(join(dir, '_base-models/Job.ts'), modelSource(false));
+    const baseModels = await scanModelFiles(join(dir, '_base-models'));
+    const baseSnapshot = await generateSQLiteDrizzleJson(buildSchema(baseModels.map((m) => m.modelClass)));
+    mkdirSync(join(dir, 'migrations'), { recursive: true });
+    writeFileSync(join(dir, 'migrations/_snapshot.json'), JSON.stringify(baseSnapshot, null, 2));
+
+    // nullable/defaultを指定せずにカラムを追加(既存テーブルへのALTER TABLE ADD COLUMNはSQLiteが拒否する組み合わせ)
+    writeFileSync(join(dir, 'src/db/models/Job.ts'), modelSource(true));
+
+    await expect(runDevMigrate(dir)).rejects.toThrow(/NOT NULL/);
+
+    const sqlFiles = readdirSync(join(dir, 'migrations')).filter((name) => name.endsWith('.sql'));
+    expect(sqlFiles).toEqual([]);
+
+    const snapshotAfter = JSON.parse(readFileSync(join(dir, 'migrations/_snapshot.json'), 'utf-8'));
+    expect(snapshotAfter).toEqual(baseSnapshot);
+  });
+});

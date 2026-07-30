@@ -4,11 +4,10 @@ import { createClient } from '@libsql/client';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import type { Config } from '../config';
 import { buildSchema } from '../db/buildSchema';
-import { readModelMeta } from '../db/decorators';
-import { applyPendingMigrations } from '../db/migrationRunner';
-import { buildDataTypeLiteral, renderDataBlock, withDataBlock } from './modelDataBlock';
+import { applyPendingMigrations, STATEMENT_BREAKPOINT } from '../db/migrationRunner';
+import { describeUnsafeAddColumnError, findUnsafeAddColumnStatements } from './migrationSafety';
 import { readBotConfig } from './readBotConfig';
-import { scanModelFiles, type ScannedModel } from './scanModelFiles';
+import { scanModelFiles } from './scanModelFiles';
 import { writeSchemaFile } from './schemaGen';
 
 const LOCAL_DB_PATH = 'file:.disbord/db/dev.db';
@@ -19,42 +18,12 @@ function timestampId(): string {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-/**
- * 各モデルファイル末尾の`namespace Xxx { export type Data = ... }`を、現在の@Column/@Relate
- * メタデータから再生成して書き戻す。TypeScriptのnamespace-classマージが同一ファイル内でしか
- * 成立しないため、disbord.d.ts側ではなくモデルファイル自身をここで書き換える（modelDataBlock.ts参照）。
- */
-function rewriteModelDataBlocks(modelsDir: string, models: ScannedModel[]): void {
-  const modelsByFile = new Map<string, ScannedModel[]>();
-  for (const model of models) {
-    const fileModels = modelsByFile.get(model.fileName) ?? [];
-    fileModels.push(model);
-    modelsByFile.set(model.fileName, fileModels);
-  }
-
-  for (const [fileName, fileModels] of modelsByFile) {
-    const filePath = join(modelsDir, `${fileName}.ts`);
-    const block = renderDataBlock(
-      fileModels.map((model) => ({
-        exportName: model.exportName,
-        typeLiteral: buildDataTypeLiteral(readModelMeta(model.modelClass)),
-      })),
-    );
-    const source = readFileSync(filePath, 'utf-8');
-    const next = withDataBlock(source, block);
-    if (next !== source) {
-      writeFileSync(filePath, next);
-    }
-  }
-}
-
-async function runDevMigrate(cwd: string): Promise<void> {
+export async function runDevMigrate(cwd: string): Promise<void> {
   const modelsDir = join(cwd, 'src/db/models');
   const migrationsDir = join(cwd, 'migrations');
   const snapshotPath = join(migrationsDir, '_snapshot.json');
 
   const models = await scanModelFiles(modelsDir);
-  rewriteModelDataBlocks(modelsDir, models);
   writeSchemaFile(cwd, models);
 
   const schema = buildSchema(models.map((m) => m.modelClass));
@@ -66,9 +35,14 @@ async function runDevMigrate(cwd: string): Promise<void> {
     : await generateSQLiteDrizzleJson({});
   const statements = await generateSQLiteMigration(prev, cur);
 
+  const unsafeStatements = findUnsafeAddColumnStatements(statements);
+  if (unsafeStatements.length > 0) {
+    throw new Error(describeUnsafeAddColumnError(unsafeStatements));
+  }
+
   if (statements.length > 0) {
     const fileName = `${timestampId()}.sql`;
-    writeFileSync(join(migrationsDir, fileName), statements.join('\n--> statement-breakpoint\n'));
+    writeFileSync(join(migrationsDir, fileName), statements.join(`\n${STATEMENT_BREAKPOINT}\n`));
     writeFileSync(snapshotPath, JSON.stringify(cur, null, 2));
     console.log(`disbord: migrations/${fileName} を生成しました`);
   } else {
@@ -117,7 +91,11 @@ async function main() {
   }
 }
 
-void main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// `runDevMigrate`をテストから直接importできるようにexportした際、モジュールの読み込みだけで
+// このスクリプト起動時専用のmain()が走ってしまわないよう、直接実行時のみに限定する。
+if (import.meta.main) {
+  void main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

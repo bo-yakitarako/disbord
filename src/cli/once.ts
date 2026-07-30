@@ -41,7 +41,7 @@ export async function runOnce(name: string, production: boolean, cwd: string): P
   const dbEnabled = Boolean(config.db?.enable);
   const coreClassName = config.coreClass?.enable ? config.coreClass.className : undefined;
 
-  // dev.ts/build.tsと同様、`.disbord/`ごと削除されていても単体で完結できるようにする。
+  // `.disbord/`ごと削除されていても単体で完結できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
   if (dbEnabled) {
     await regenerateSchemaFile(cwd);

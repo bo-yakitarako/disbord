@@ -1,18 +1,46 @@
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 export type ModelClass = (abstract new (...args: any[]) => unknown) & { tableName: string };
 
 export type ColumnType = 'text' | 'integer' | 'real';
 export type ColumnMode = 'boolean' | 'timestamp_ms' | 'number';
 
-export type ColumnOptions = {
+type BaseColumnOptions = {
   name?: string;
   nullable?: boolean;
   unique?: boolean;
-  enum?: readonly string[];
-  mode?: ColumnMode;
-  default?: unknown;
 };
+
+/**
+ * `default`は固定値か関数を渡せる。固定値はDB側の`DEFAULT`句、関数はdrizzle-orm（JS側）が
+ * INSERT時に評価する値になる（後者は生SQLのINSERTには効かない）。
+ */
+export type TextColumnOptions = BaseColumnOptions & {
+  mode?: undefined;
+  enum?: readonly string[];
+  default?: string | (() => string);
+};
+
+export type RealColumnOptions = BaseColumnOptions & {
+  mode?: undefined;
+  default?: number | (() => number);
+};
+
+export type IntegerColumnOptions =
+  | (BaseColumnOptions & { mode?: 'number'; default?: number | (() => number) })
+  | (BaseColumnOptions & { mode: 'boolean'; default?: boolean | (() => boolean) })
+  | (BaseColumnOptions & {
+      mode: 'timestamp_ms';
+      /**
+       * 固定値・関数に加え、特別な値`'now'`も指定できる。DB側の
+       * `DEFAULT (unixepoch('subsec') * 1000)`（挿入時刻のミリ秒unix時間）になる。
+       * accessorの読み取り型に合わせて`Date`ではなく`Dayjs`で指定する
+       * （実際にDBへ渡す際はDayjs→Dateへ変換される）。
+       */
+      default?: 'now' | Dayjs | (() => Dayjs);
+    });
+
+export type ColumnOptions = TextColumnOptions | RealColumnOptions | IntegerColumnOptions;
 
 export type RelateOptions = {
   onDelete?: 'cascade' | 'set null' | 'restrict' | 'no action';
@@ -22,7 +50,10 @@ export type RelateOptions = {
   inverseRelationName?: string;
 };
 
-export type ColumnMeta = { property: string; type: ColumnType; options: ColumnOptions };
+export type ColumnMeta =
+  | { property: string; type: 'text'; options: TextColumnOptions }
+  | { property: string; type: 'real'; options: RealColumnOptions }
+  | { property: string; type: 'integer'; options: IntegerColumnOptions };
 export type MarkerMeta = { properties: string[]; name?: string };
 export type RelateMeta = { property: string; target: () => ModelClass; options: RelateOptions };
 
@@ -66,11 +97,19 @@ function dataGetter(
   };
 }
 
-export function Column(type: ColumnType, options: ColumnOptions = {}) {
+type ColumnDecorator = (
+  target: unknown,
+  context: ClassAccessorDecoratorContext,
+) => { get(this: any): any; set(this: any): void };
+
+export function Column(type: 'text', options?: TextColumnOptions): ColumnDecorator;
+export function Column(type: 'real', options?: RealColumnOptions): ColumnDecorator;
+export function Column(type: 'integer', options?: IntegerColumnOptions): ColumnDecorator;
+export function Column(type: ColumnType, options: ColumnOptions = {}): ColumnDecorator {
   return function (_target: unknown, context: ClassAccessorDecoratorContext) {
     const metadata = context.metadata as MetadataBag;
     const property = String(context.name);
-    push<ColumnMeta>(metadata, COLUMNS, { property, type, options });
+    push<ColumnMeta>(metadata, COLUMNS, { property, type, options } as ColumnMeta);
     if (options.unique) {
       push<MarkerMeta>(metadata, UNIQUES, { properties: [property] });
     }

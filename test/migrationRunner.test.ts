@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createClient } from '@libsql/client';
-import { applyPendingMigrations } from '../src/db/migrationRunner';
+import { applyPendingMigrations, STATEMENT_BREAKPOINT } from '../src/db/migrationRunner';
 
 let dir: string;
 
@@ -53,5 +53,34 @@ describe('applyPendingMigrations', () => {
     const client = createClient({ url: ':memory:' });
     const applied = await applyPendingMigrations(client, join(dir, 'not-exists'));
     expect(applied).toEqual([]);
+  });
+
+  test('nullable→NOT NULLのようなテーブル作り直しmigrationが既存NULL行で失敗しても、__new_ prefixのテーブルが残らずロールバックされる(実際に踏んだ不具合の再現)', async () => {
+    const client = createClient({ url: ':memory:' });
+    await client.executeMultiple('CREATE TABLE jobs (id text PRIMARY KEY, sample text);');
+    await client.execute("INSERT INTO jobs (id, sample) VALUES ('1', NULL);");
+
+    const recreateStatements = [
+      'PRAGMA foreign_keys=OFF;',
+      'CREATE TABLE `__new_jobs` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`sample` text NOT NULL\n);',
+      'INSERT INTO `__new_jobs`("id", "sample") SELECT "id", "sample" FROM `jobs`;',
+      'DROP TABLE `jobs`;',
+      'ALTER TABLE `__new_jobs` RENAME TO `jobs`;',
+      'PRAGMA foreign_keys=ON;',
+    ];
+    writeFileSync(join(dir, '20260101000000.sql'), recreateStatements.join(`\n${STATEMENT_BREAKPOINT}\n`));
+
+    await expect(applyPendingMigrations(client, dir)).rejects.toThrow(/NOT NULL constraint failed/);
+
+    const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    expect(tables.rows.map((r) => r.name)).not.toContain('__new_jobs');
+    expect(tables.rows.map((r) => r.name)).toContain('jobs');
+
+    const rows = await client.execute('SELECT * FROM jobs');
+    expect(rows.rows.map((r) => ({ id: r.id, sample: r.sample }))).toEqual([{ id: '1', sample: null }]);
+
+    // 失敗したmigrationファイルは適用済み扱いにならず、次回も同じファイルを再試行できる
+    const trackingRows = await client.execute('SELECT filename FROM __disbord_migrations');
+    expect(trackingRows.rows).toEqual([]);
   });
 });

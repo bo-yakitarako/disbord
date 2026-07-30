@@ -14,7 +14,7 @@ import {
 import { Model } from '../src/db/Model';
 
 @Table('users')
-class User extends Model<User.Data> {
+class User extends Model {
   @Unique()
   @Column('text')
   accessor email!: string;
@@ -23,13 +23,9 @@ class User extends Model<User.Data> {
   accessor name!: string;
 }
 
-namespace User {
-  export type Data = { email: string; name: string };
-}
-
 @Table('jobs')
 @CompoundIndex(['userId', 'name'])
-class Job extends Model<Job.Data> {
+class Job extends Model {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
   accessor userId!: string;
 
@@ -45,11 +41,46 @@ class Job extends Model<Job.Data> {
   accessor name!: string;
 }
 
-namespace Job {
-  export type Data = { userId: string; scheduledAt: Date; slug: string; name: string };
-}
-
 const now = new Date();
+
+@Table('reminders')
+class Reminder extends Model {
+  @Column('text', { default: 'pending' })
+  accessor status!: string;
+
+  @Column('integer', { mode: 'boolean', default: true })
+  accessor archived!: boolean;
+
+  @Column('integer', { mode: 'timestamp_ms', default: 'now' })
+  accessor firedAt!: Dayjs;
+
+  @Column('integer', { mode: 'timestamp_ms', default: dayjs() })
+  accessor remindAt!: Dayjs;
+
+  // @ts-expect-error timestamp_msのdefaultはDayjs指定(生のDateは不可)
+  @Column('integer', { mode: 'timestamp_ms', default: now })
+  accessor bad0!: Dayjs;
+
+  // @ts-expect-error text列のdefaultはstringのみ(numberは不可)
+  @Column('text', { default: 123 })
+  accessor bad1!: string;
+
+  // @ts-expect-error mode: 'boolean'列のdefaultはbooleanのみ(stringは不可)
+  @Column('integer', { mode: 'boolean', default: 'yes' })
+  accessor bad2!: boolean;
+
+  // @ts-expect-error 'now'はmode: 'timestamp_ms'限定(mode: 'number'では不可)
+  @Column('integer', { mode: 'number', default: 'now' })
+  accessor bad3!: number;
+
+  // @ts-expect-error 'now'はmode: 'timestamp_ms'限定(realカラムでは不可)
+  @Column('real', { default: 'now' })
+  accessor bad4!: number;
+
+  // @ts-expect-error enumはtext列限定(integer列では不可)
+  @Column('integer', { enum: ['a', 'b'] })
+  accessor bad5!: string;
+}
 
 describe('decorators', () => {
   test('@Tableがクラスに_tableNameを設定する', () => {
@@ -147,5 +178,13 @@ describe('decorators', () => {
     });
     expect(dayjs.isDayjs(job.createdAt)).toBe(true);
     expect(dayjs.isDayjs(job.updatedAt)).toBe(true);
+  });
+
+  test('@Columnのdefaultはtype/modeごとに型付けされ、指定した値がそのままmetadataに残る(型安全性は@ts-expect-errorで固定済み)', () => {
+    const meta = readModelMeta(Reminder as unknown as ModelClass);
+    const byProperty = Object.fromEntries(meta.columns.map((c) => [c.property, c.options.default]));
+    expect(byProperty.status).toBe('pending');
+    expect(byProperty.archived).toBe(true);
+    expect(byProperty.firedAt).toBe('now');
   });
 });

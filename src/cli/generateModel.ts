@@ -1,9 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { toSnakeCase } from '../db/buildSchema';
-import { readModelMeta, type ModelClass } from '../db/decorators';
-import { buildDataTypeLiteral, renderDataBlock, withDataBlock } from './modelDataBlock';
 import { readBotConfig } from './readBotConfig';
 
 function pluralize(word: string): string {
@@ -33,16 +30,16 @@ function toTableName(className: string): string {
 }
 
 /**
- * `namespace ${name} { export type Data = ... }`はここでは書かない。
- * `disbord migrate`と同じ仕組み（modelDataBlock.ts）で、書き出し直後にこのファイル自身を
- * 動的importして@Column/@Relateのメタデータから機械的に末尾へ追記する。
+ * Data型（Model.create()等の入力型）はnamespace/型ブロックとしてファイルへ書き戻す必要はない。
+ * `class ${name} extends Model`のアクセサ宣言自体から`Model.ts`側が構造的に導出するため
+ * （`ModelData<C> = UnwrapDayjs<Omit<C, keyof Model>>`参照）、生成後の動的import・追記は不要。
  */
 export function generateModelFileContent(name: string): string {
   const tableName = toTableName(name);
   return `import { Column, Model, Table } from 'disbord';
 
 @Table('${tableName}')
-export class ${name} extends Model<${name}.Data> {
+export class ${name} extends Model {
   @Column('text')
   accessor sample!: string;
 }
@@ -62,12 +59,6 @@ export async function runGenerateModel(name: string, cwd: string): Promise<void>
 
   mkdirSync(join(cwd, 'src/db/models'), { recursive: true });
   writeFileSync(targetPath, generateModelFileContent(name));
-
-  const module: Record<string, unknown> = await import(pathToFileURL(targetPath).href);
-  const modelClass = module[name] as ModelClass;
-  const meta = readModelMeta(modelClass);
-  const block = renderDataBlock([{ exportName: name, typeLiteral: buildDataTypeLiteral(meta) }]);
-  writeFileSync(targetPath, withDataBlock(readFileSync(targetPath, 'utf-8'), block));
 
   console.log(`disbord: src/db/models/${name}.ts を生成しました`);
 }

@@ -1,4 +1,5 @@
-import { relations } from 'drizzle-orm';
+import dayjs from 'dayjs';
+import { relations, sql } from 'drizzle-orm';
 import { index, integer, primaryKey, real, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
 import { readModelMeta, type ColumnMeta, type ModelClass, type ModelMeta, type RelateMeta } from './decorators';
 
@@ -12,24 +13,64 @@ function relationPropertyName(property: string): string {
   return property.endsWith('Id') ? property.slice(0, -'Id'.length) : property;
 }
 
+/**
+ * `mode: 'timestamp_ms'`のカラムに限り`default: 'now'`をDB側の`DEFAULT (unixepoch('subsec') * 1000)`
+ * （挿入時刻・ミリ秒精度）へ変換する。それ以外の型/modeでは'now'をただの文字列リテラルの
+ * default値として扱う(明示的に対応を絞ることで、意図しない型のカラムに紛れ込んでも
+ * 黙って壊れた変換をしないようにする)。
+ */
+function isTimestampMsColumn(colMeta: ColumnMeta): boolean {
+  return colMeta.type === 'integer' && colMeta.options.mode === 'timestamp_ms';
+}
+
+/**
+ * `mode: 'timestamp_ms'`のカラムに限り`default: 'now'`をDB側の`DEFAULT (unixepoch('subsec') * 1000)`
+ * （挿入時刻・ミリ秒精度）へ変換する。それ以外の型/modeでは'now'をただの文字列リテラルの
+ * default値として扱う(明示的に対応を絞ることで、意図しない型のカラムに紛れ込んでも
+ * 黙って壊れた変換をしないようにする)。
+ */
+function isNowDefault(colMeta: ColumnMeta): boolean {
+  return isTimestampMsColumn(colMeta) && colMeta.options.default === 'now';
+}
+
+/**
+ * `mode: 'timestamp_ms'`のdefaultはaccessorの読み取り型に合わせてDayjsで指定できるが、
+ * drizzleに渡す値は`.getTime()`を呼べる生の`Date`が必要（Dayjsインスタンスのままだと
+ * `value.getTime is not a function`で壊れる）。値・関数どちらの場合もDayjsだけDateへ変換する。
+ */
+function normalizeDefaultValue(value: unknown): unknown {
+  return dayjs.isDayjs(value) ? value.toDate() : value;
+}
+
 function createColumnBuilder(dbName: string, colMeta: ColumnMeta): any {
-  const options = colMeta.options;
   let builder: any;
   if (colMeta.type === 'text') {
-    builder = options.enum ? text(dbName, { enum: options.enum as [string, ...string[]] }) : text(dbName);
+    builder = colMeta.options.enum
+      ? text(dbName, { enum: colMeta.options.enum as [string, ...string[]] })
+      : text(dbName);
   } else if (colMeta.type === 'integer') {
-    builder = options.mode ? integer(dbName, { mode: options.mode }) : integer(dbName);
+    builder = colMeta.options.mode ? integer(dbName, { mode: colMeta.options.mode }) : integer(dbName);
   } else {
     builder = real(dbName);
   }
+
+  const options = colMeta.options;
   if (!options.nullable) {
     builder = builder.notNull();
   }
-  if (options.default !== undefined) {
+  if (isNowDefault(colMeta)) {
+    builder = builder.default(sql`(unixepoch('subsec') * 1000)`);
+  } else if (typeof options.default === 'function') {
+    builder = builder.$defaultFn(() => normalizeDefaultValue((options.default as () => unknown)()));
+  } else if (options.default !== undefined) {
+    const value = normalizeDefaultValue(options.default);
+    // timestamp_msの固定値defaultはdrizzleに生のDateを渡すと`DEFAULT '"2026-..."'`のような
+    // JSON文字列がDDLに埋め込まれてしまう(実機確認済み: SQLiteの生INSERTで壊れた値になる)ため、
+    // ミリ秒unix時間のリテラルを直接SQL式として埋め込む。
     builder =
-      typeof options.default === 'function'
-        ? builder.$defaultFn(options.default as () => unknown)
-        : builder.default(options.default);
+      isTimestampMsColumn(colMeta) && value instanceof Date
+        ? builder.default(sql.raw(String(value.getTime())))
+        : builder.default(value);
   }
   return builder;
 }
@@ -67,17 +108,17 @@ function resolveDbNames(meta: ModelMeta): Map<string, string> {
   return names;
 }
 
+/**
+ * カラム順は`id`→モデル自身が宣言したカラム→`created_at`/`updated_at`にする
+ * (オブジェクトのkey挿入順がそのままCREATE TABLEの列順になるため、この並びで組み立てる)。
+ */
 function buildTableColumns(
   meta: ModelMeta,
   dbNames: Map<string, string>,
   tableNameByModel: Map<ModelClass, string>,
   tables: Record<string, any>,
 ) {
-  const columns: Record<string, any> = {
-    id: buildIdColumn(meta),
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-  };
+  const columns: Record<string, any> = { id: buildIdColumn(meta) };
 
   const relatesByProperty = new Map(meta.relates.map((relate) => [relate.property, relate] as const));
   for (const [property, colMeta] of collectColumnDefs(meta)) {
@@ -92,6 +133,9 @@ function buildTableColumns(
     }
     columns[property] = builder;
   }
+
+  columns.createdAt = integer('created_at', { mode: 'timestamp_ms' }).notNull();
+  columns.updatedAt = integer('updated_at', { mode: 'timestamp_ms' }).notNull();
   return columns;
 }
 

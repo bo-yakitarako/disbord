@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { createTableRelationsHelpers, Many, One } from 'drizzle-orm';
 import { buildSchema } from '../src/db/buildSchema';
@@ -7,7 +7,7 @@ import { Column, CompoundIndex, Index, Relate, Table, Unique, type ModelClass } 
 import { Model } from '../src/db/Model';
 
 @Table('users')
-class User extends Model<User.Data> {
+class User extends Model {
   @Unique()
   @Column('text')
   accessor email!: string;
@@ -16,12 +16,8 @@ class User extends Model<User.Data> {
   accessor name!: string;
 }
 
-namespace User {
-  export type Data = { email: string; name: string };
-}
-
 @Table('jobs')
-class Job extends Model<Job.Data> {
+class Job extends Model {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
   accessor userId!: string;
 
@@ -29,13 +25,9 @@ class Job extends Model<Job.Data> {
   accessor name!: string;
 }
 
-namespace Job {
-  export type Data = { userId: string; name: string };
-}
-
 @Table('workTimes')
 @CompoundIndex(['userId', 'jobId'])
-class WorkTime extends Model<WorkTime.Data> {
+class WorkTime extends Model {
   @Relate(() => User as unknown as ModelClass, { onDelete: 'cascade' })
   accessor userId!: string;
 
@@ -48,10 +40,6 @@ class WorkTime extends Model<WorkTime.Data> {
 
   @Column('text', { enum: ['working', 'resting', 'workOff'] })
   accessor status!: string;
-}
-
-namespace WorkTime {
-  export type Data = { userId: string; jobId: string; actedAt: Date; status: string };
 }
 
 const models = [User, Job, WorkTime] as unknown as ModelClass[];
@@ -75,6 +63,21 @@ describe('buildSchema', () => {
     expect(sql).toContain('`id` text PRIMARY KEY NOT NULL');
     expect(sql).toContain('`created_at` integer NOT NULL');
     expect(sql).toContain('`updated_at` integer NOT NULL');
+  });
+
+  test('カラム順はid→モデル自身が宣言したカラム(宣言順)→created_at→updated_atになる', async () => {
+    const sql = await migrationSqlFor(buildSchema([User] as unknown as ModelClass[]));
+    const idIdx = sql.indexOf('`id`');
+    const emailIdx = sql.indexOf('`email`');
+    const nameIdx = sql.indexOf('`name`');
+    const createdAtIdx = sql.indexOf('`created_at`');
+    const updatedAtIdx = sql.indexOf('`updated_at`');
+
+    expect(idIdx).toBeGreaterThanOrEqual(0);
+    expect(idIdx).toBeLessThan(emailIdx);
+    expect(emailIdx).toBeLessThan(nameIdx);
+    expect(nameIdx).toBeLessThan(createdAtIdx);
+    expect(createdAtIdx).toBeLessThan(updatedAtIdx);
   });
 
   test('@Relateは.references()によるFOREIGN KEYを生成する', async () => {
@@ -120,5 +123,41 @@ describe('buildSchema', () => {
     const cur = await generateSQLiteDrizzleJson(buildSchema(models));
     const statements = await generateSQLiteMigration(prev, cur);
     expect(statements).toEqual([]);
+  });
+});
+
+describe("mode: 'timestamp_ms'でdefault: 'now'を指定した場合", () => {
+  @Table('reminders')
+  class Reminder extends Model {
+    @Column('integer', { mode: 'timestamp_ms', default: 'now' })
+    accessor firedAt!: Dayjs;
+  }
+
+  test("DB側のDEFAULT (unixepoch('subsec') * 1000)（挿入時刻・ミリ秒精度）になる", async () => {
+    const sql = await migrationSqlFor(buildSchema([Reminder] as unknown as ModelClass[]));
+    expect(sql).toContain(`\`fired_at\` integer DEFAULT (unixepoch('subsec') * 1000) NOT NULL`);
+  });
+
+  @Table('notes')
+  class Note extends Model {
+    @Column('text', { default: 'now' })
+    accessor label!: string;
+  }
+
+  test("mode: 'timestamp_ms'以外では'now'は単なる文字列リテラルのdefaultとして扱われる(特別扱いしない)", async () => {
+    const sql = await migrationSqlFor(buildSchema([Note] as unknown as ModelClass[]));
+    expect(sql).toContain("`label` text DEFAULT 'now' NOT NULL");
+    expect(sql).not.toContain('unixepoch');
+  });
+
+  @Table('alarms')
+  class Alarm extends Model {
+    @Column('integer', { mode: 'timestamp_ms', default: dayjs('2026-01-01T00:00:00.000Z') })
+    accessor firedAt!: Dayjs;
+  }
+
+  test('固定値のDayjsを指定した場合、ミリ秒unix時間の整数リテラルがDEFAULTになる(生のDateを渡すとJSON文字列化されて壊れるため変換する)', async () => {
+    const sql = await migrationSqlFor(buildSchema([Alarm] as unknown as ModelClass[]));
+    expect(sql).toContain('`fired_at` integer DEFAULT 1767225600000 NOT NULL');
   });
 });
