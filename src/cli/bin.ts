@@ -5,6 +5,7 @@ import { runDev } from './dev';
 import { parseDisableArgs, runDisable } from './disable';
 import { parseEnableArgs, runEnable } from './enable';
 import { parseEnvArgs, runEnvAction, runEnvActionAll, runEnvToggle, runEnvToggleAll } from './env';
+import { runGenerateComponent, type ComponentKind } from './generateComponent';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
 import { runGenerateOnce } from './generateOnce';
@@ -35,6 +36,7 @@ const IMPLEMENTED_COMMANDS = [
   'generate event',
   'generate model',
   'generate once',
+  'generate component',
   'once',
   'migrate',
   'studio',
@@ -95,8 +97,12 @@ async function dispatch(): Promise<number> {
       await runGenerateOnce(rest[0], process.cwd());
       return 0;
     }
+    if (sub === 'component' && (rest[0] === 'button' || rest[0] === 'selectMenu')) {
+      await runGenerateComponent(rest[0] as ComponentKind, process.cwd());
+      return 0;
+    }
     throw new Error(
-      'disbord: 使い方: disbord generate event <name> | disbord generate model <Name> | disbord generate once <name>',
+      'disbord: 使い方: disbord generate event <name> | disbord generate model <Name> | disbord generate once <name> | disbord generate component <button|selectMenu>',
     );
   }
 
@@ -140,6 +146,7 @@ async function dispatch(): Promise<number> {
     'generate event',
     'generate model',
     'generate once',
+    'generate component',
     'once',
     'migrate',
     'studio',

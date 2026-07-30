@@ -48,6 +48,7 @@ export function generatePackageJson(name: string): string {
           'commands:delete': 'disbord commands delete',
           'gen:event': 'disbord generate event',
           'gen:once': 'disbord generate once',
+          'gen:component': 'disbord generate component',
           enable: 'disbord enable',
           disable: 'disbord disable',
           env: 'disbord env',
@@ -290,22 +291,13 @@ export function generateCoreStub(className: string = DEFAULT_CORE_CLASS_NAME): s
  * テキストパッチではなく毎回丸ごと再生成する。create-disbord-app初期生成時・
  * `disbord enable`・`disbord disable`・`disbord env`のいずれもこの関数を使う)。
  */
-export function generateDisbordDts(options: {
-  db: boolean;
-  coreClass: boolean;
-  coreClassName?: string;
-  envKeys?: EnvKeyType[];
-}): string {
-  const coreClassName = options.coreClassName ?? DEFAULT_CORE_CLASS_NAME;
-  const coreImportLine = options.coreClass ? `\nimport type { ${coreClassName} } from '@/${coreClassName}';` : '';
-  const coreField = options.coreClass ? `\n    core: InstanceType<typeof ${coreClassName}>;` : '';
-  const schemaImportLine = options.db ? `\nimport type { schema } from './db/schema';` : '';
-  const schemaField = options.db ? '\n    schema: typeof schema;' : '';
-  const envKeys = options.envKeys ?? [];
-  const envBlock =
-    envKeys.length === 0
-      ? ''
-      : `\ndeclare global {
+function optionalLine(enabled: boolean, line: string): string {
+  return enabled ? line : '';
+}
+
+function buildEnvBlock(envKeys: EnvKeyType[]): string {
+  if (envKeys.length === 0) return '';
+  return `\ndeclare global {
   namespace NodeJS {
     interface ProcessEnv {
 ${envKeys.map(({ key, required }) => `      ${key}${required ? '' : '?'}: string;`).join('\n')}
@@ -313,16 +305,40 @@ ${envKeys.map(({ key, required }) => `      ${key}${required ? '' : '?'}: string
   }
 }
 `;
+}
 
-  return `import type buttons from '@/components/buttons';
-import type selectMenus from '@/components/selectMenus';
-import type slashCommands from '@/components/slashCommands';${coreImportLine}${schemaImportLine}
+export function generateDisbordDts(options: {
+  db: boolean;
+  coreClass: boolean;
+  coreClassName?: string;
+  envKeys?: EnvKeyType[];
+  buttons?: boolean;
+  selectMenus?: boolean;
+}): string {
+  const buttonsEnabled = options.buttons ?? true;
+  const selectMenusEnabled = options.selectMenus ?? true;
+  const coreClassName = options.coreClassName ?? DEFAULT_CORE_CLASS_NAME;
+  const coreImportLine = optionalLine(
+    options.coreClass,
+    `\nimport type { ${coreClassName} } from '@/${coreClassName}';`,
+  );
+  const coreField = optionalLine(options.coreClass, `\n    core: InstanceType<typeof ${coreClassName}>;`);
+  const schemaImportLine = optionalLine(options.db, `\nimport type { schema } from './db/schema';`);
+  const schemaField = optionalLine(options.db, '\n    schema: typeof schema;');
+  const buttonsImportLine = optionalLine(buttonsEnabled, `\nimport type buttons from '@/components/buttons';`);
+  const buttonsField = optionalLine(buttonsEnabled, '\n    buttons: typeof buttons;');
+  const selectMenusImportLine = optionalLine(
+    selectMenusEnabled,
+    `\nimport type selectMenus from '@/components/selectMenus';`,
+  );
+  const selectMenusField = optionalLine(selectMenusEnabled, '\n    selectMenus: typeof selectMenus;');
+  const envBlock = buildEnvBlock(options.envKeys ?? []);
+
+  return `import type slashCommands from '@/components/slashCommands';${buttonsImportLine}${selectMenusImportLine}${coreImportLine}${schemaImportLine}
 
 declare module 'disbord' {
   interface Registry {
-    buttons: typeof buttons;
-    selectMenus: typeof selectMenus;
-    slashCommands: typeof slashCommands;${coreField}${schemaField}
+    slashCommands: typeof slashCommands;${buttonsField}${selectMenusField}${coreField}${schemaField}
   }
 }
 ${envBlock}`;
@@ -372,6 +388,7 @@ export default {
 | \`disbord env decrypt [--production\\|--all]\` | \`env/\`配下を復号する（固定） |
 | \`disbord generate event <name>\` | \`src/events/<name>.ts\`のひな形を追加生成する |
 | \`disbord generate once <name>\` | \`src/once/<name>.ts\`のひな形を追加生成する |
+| \`disbord generate component <button\\|selectMenu>\` | \`src/components/buttons.ts\`・\`selectMenus.ts\`を追加生成する（未生成なら） |
 | \`disbord once <name> [--production]\` | \`src/once/<name>.ts\`をbotとして1回だけ起動して実行する |
 | \`disbord generate model <Name>\` | \`src/db/models/<Name>.ts\`にdecorator付きモデルクラスを追加生成する（DB有効時のみ） |
 | \`disbord migrate [--production]\` | モデル定義から\`schema.ts\`・migrationファイルを生成し、DBに適用する（DB有効時のみ） |
@@ -386,6 +403,8 @@ export default {
 ## components（\`src/components/\`）
 
 \`buttons.ts\` / \`selectMenus.ts\` / \`slashCommands.ts\`にそれぞれ\`export default { ... } satisfies XxxRegistration\`の形でルーティングを宣言します。discord.jsのBuilderは直書きせず、素朴なオブジェクト（例: \`{ label, style?, disabled?, args? }\`）または\`(...args) => component\`の関数で書きます。
+
+\`slashCommands.ts\`だけは必須で、\`buttons.ts\`/\`selectMenus.ts\`は任意です。使う時だけ\`disbord generate component button\` / \`disbord generate component selectMenu\`で追加生成してください。
 
 \`\`\`ts
 // src/components/buttons.ts
@@ -406,7 +425,7 @@ export default {
 - \`argsSplitter?: string\`をentryごとに指定でき、customIdの区切り文字を上書きできる
 - \`slashCommands.ts\`は\`{ description?, options?, execute }\`のオブジェクト形に加え、\`execute\`関数を直接指定する形（例: \`ping: async (interaction) => {...}\`）も書ける
 
-\`makeButtonRow\` / \`makeSelectMenuRow\`は\`disbord\`から直接importして使い、ジェネリクスは書きません（\`.disbord/disbord.d.ts\`のmodule augmentationで自botのregistration型を暗黙解決します）。
+\`makeButtonRow\` / \`makeSelectMenuRow\`は\`disbord\`から直接importして使い、ジェネリクスは書きません。
 
 ## events（\`src/events/\`）
 
@@ -423,7 +442,7 @@ export default async function (message: Message) {
 
 ## once（\`src/once/\`）
 
-常駐せず1回だけ処理を実行して終了するbot用の入り口です。\`disbord generate once <name>\`で\`src/once/<name>.ts\`を生成し、\`disbord once <name> [--production]\`で実行します（\`disbord build\`は\`dist/<name>.js\`としても出力します。\`main\`はbot本体のエントリ\`dist/main.js\`と衝突するため予約済みで使えません）。DB有効時は\`db\`/\`Model\`、coreClass有効時は\`coreStore\`もそのままimportして使えます。\`client.destroy()\`は実実行ファイル（\`.disbord/once/<name>.ts\`）側が自動で呼ぶため、\`src/once/<name>.ts\`側に書く必要はありません。
+常駐せず1回だけ処理を実行して終了するbot用の入り口です。\`disbord generate once <name>\`で\`src/once/<name>.ts\`を生成し、\`disbord once <name> [--production]\`で実行します（\`disbord build\`は\`dist/<name>.js\`としても出力します。\`main\`はbot本体のエントリ\`dist/main.js\`と衝突するため予約済みで使えません）。DB有効時は\`db\`/\`Model\`、coreClass有効時は\`coreStore\`もそのままimportして使えます。
 
 \`\`\`ts
 // src/once/notice.ts
@@ -482,7 +501,7 @@ bun run test    # bun test
 bunx tsc --noEmit
 \`\`\`
 
-lint設定は\`disbord/lint\`をextendsする\`oxlint.config.ts\`（TS製）。typecheckは\`tsgo\`ではなく\`tsc\`を使います（TypeScript v7の\`tsc\`は既にネイティブ実装への薄いシムのため）。pre-commitでlint→fmt→env暗号化（\`--all\`）が自動実行されます。
+lint設定は\`disbord/lint\`をextendsする\`oxlint.config.ts\`（TS製）。pre-commitでlint→fmt→env暗号化（\`--all\`）が自動実行されます。
 `;
 }
 

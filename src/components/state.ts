@@ -1,8 +1,8 @@
 import type { ButtonRegistration, SelectMenuRegistration } from './types';
 
 type ComponentsState = {
-  buttons: ButtonRegistration<any>;
-  selectMenus: SelectMenuRegistration<any>;
+  buttons?: ButtonRegistration<any>;
+  selectMenus?: SelectMenuRegistration<any>;
   argsSplitter?: string;
 };
 

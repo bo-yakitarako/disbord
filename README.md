@@ -56,6 +56,7 @@ export default {
 | `disbord env decrypt [--production\|--all]` | `env/`配下を復号する（固定） |
 | `disbord generate event <name>` | `src/events/<name>.ts`のひな形を追加生成する |
 | `disbord generate once <name>` | `src/once/<name>.ts`のひな形を追加生成する |
+| `disbord generate component <button\|selectMenu>` | `src/components/buttons.ts`・`selectMenus.ts`を追加生成する（未生成なら） |
 | `disbord once <name> [--production]` | `src/once/<name>.ts`をbotとして1回だけ起動して実行する |
 | `disbord generate model <Name>` | `src/db/models/<Name>.ts`にdecorator付きモデルクラスを追加生成する（DB有効時のみ） |
 | `disbord migrate [--production]` | モデル定義から`schema.ts`・migrationファイルを生成し、DBに適用する（DB有効時のみ） |
@@ -70,6 +71,8 @@ export default {
 ## components（`src/components/`）
 
 `buttons.ts` / `selectMenus.ts` / `slashCommands.ts`にそれぞれ`export default { ... } satisfies XxxRegistration`の形でルーティングを宣言します。discord.jsのBuilderは直書きせず、素朴なオブジェクト（例: `{ label, style?, disabled?, args? }`）または`(...args) => component`の関数で書きます。
+
+`slashCommands.ts`だけは必須で、`buttons.ts`/`selectMenus.ts`は任意です。使う時だけ`disbord generate component button` / `disbord generate component selectMenu`で追加生成してください。
 
 ```ts
 // src/components/buttons.ts
@@ -90,7 +93,7 @@ export default {
 - `argsSplitter?: string`をentryごとに指定でき、customIdの区切り文字を上書きできる
 - `slashCommands.ts`は`{ description?, options?, execute }`のオブジェクト形に加え、`execute`関数を直接指定する形（例: `ping: async (interaction) => {...}`）も書ける
 
-`makeButtonRow` / `makeSelectMenuRow`は`disbord`から直接importして使い、ジェネリクスは書きません（`.disbord/disbord.d.ts`のmodule augmentationで自botのregistration型を暗黙解決します）。
+`makeButtonRow` / `makeSelectMenuRow`は`disbord`から直接importして使い、ジェネリクスは書きません。
 
 ## events（`src/events/`）
 
@@ -107,7 +110,7 @@ export default async function (message: Message) {
 
 ## once（`src/once/`）
 
-常駐せず1回だけ処理を実行して終了するbot用の入り口です。`disbord generate once <name>`で`src/once/<name>.ts`を生成し、`disbord once <name> [--production]`で実行します（`disbord build`は`dist/<name>.js`としても出力します。`main`はbot本体のエントリ`dist/main.js`と衝突するため予約済みで使えません）。DB有効時は`db`/`Model`、coreClass有効時は`coreStore`もそのままimportして使えます。`client.destroy()`は実実行ファイル（`.disbord/once/<name>.ts`）側が自動で呼ぶため、`src/once/<name>.ts`側に書く必要はありません。
+常駐せず1回だけ処理を実行して終了するbot用の入り口です。`disbord generate once <name>`で`src/once/<name>.ts`を生成し、`disbord once <name> [--production]`で実行します（`disbord build`は`dist/<name>.js`としても出力します。`main`はbot本体のエントリ`dist/main.js`と衝突するため予約済みで使えません）。DB有効時は`db`/`Model`、coreClass有効時は`coreStore`もそのままimportして使えます。
 
 ```ts
 // src/once/notice.ts
@@ -170,4 +173,4 @@ bun run test    # bun test
 bunx tsc --noEmit
 ```
 
-lint設定は`disbord/lint`をextendsする`oxlint.config.ts`（TS製）。typecheckは`tsgo`ではなく`tsc`を使います（TypeScript v7の`tsc`は既にネイティブ実装への薄いシムのため）。`create-disbord-app`が生成する`lefthook.yml`により、pre-commitでlint→fmt→env暗号化（`--all`）が自動実行されます。
+lint設定は`disbord/lint`をextendsする`oxlint.config.ts`（TS製）。`create-disbord-app`が生成する`lefthook.yml`により、pre-commitでlint→fmt→env暗号化（`--all`）が自動実行されます。

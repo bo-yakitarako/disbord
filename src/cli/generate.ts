@@ -1,4 +1,5 @@
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { Events } from 'discord.js';
 
 const RESERVED_EVENT_NAME = 'interactionCreate';
@@ -31,6 +32,19 @@ export function scanEventFiles(eventsDir: string): string[] {
   return names;
 }
 
+export type ComponentFilesPresence = { hasButtons: boolean; hasSelectMenus: boolean };
+
+/**
+ * buttons.ts/selectMenus.tsはslashCommands.tsと違い任意（`disbord generate component`で追加生成する）
+ * ため、実在チェックだけで済む固定2ファイルの存在確認にする（events/onceのような可変長スキャンとは違う）。
+ */
+export function scanComponentFiles(componentsDir: string): ComponentFilesPresence {
+  return {
+    hasButtons: existsSync(join(componentsDir, 'buttons.ts')),
+    hasSelectMenus: existsSync(join(componentsDir, 'selectMenus.ts')),
+  };
+}
+
 function handlerIdentifier(eventName: string): string {
   return `${eventName}Handler`;
 }
@@ -44,12 +58,82 @@ export type GenerateMainSourceOptions = {
   origin?: 'dev' | 'build';
   dbEnabled?: boolean;
   coreClassName?: string;
+  hasButtons?: boolean;
+  hasSelectMenus?: boolean;
 };
+
+function buildInteractionRouting(hasButtons: boolean, hasSelectMenus: boolean): string {
+  let body = `      if (interaction.isChatInputCommand()) {
+        await routeSlashCommandInteraction(interaction, slashCommands);
+      }`;
+  if (hasButtons) {
+    body += ` else if (interaction.isButton()) {
+        await routeButtonInteraction(interaction, buttons, coreOption as never, { argsSplitter: config.argsSplitter });
+      }`;
+  }
+  if (hasSelectMenus) {
+    body += ` else if (interaction.isStringSelectMenu()) {
+        await routeSelectMenuInteraction(interaction, selectMenus, coreOption as never, {
+          argsSplitter: config.argsSplitter,
+        });
+      }`;
+  }
+  return body;
+}
+
+function optionalLine(enabled: boolean, line: string): string {
+  return enabled ? line : '';
+}
+
+function buildDisbordImports(dbEnabled: boolean, hasButtons: boolean, hasSelectMenus: boolean): string[] {
+  return [
+    'type Config',
+    'createCoreStore',
+    'handleBotError',
+    'routeSlashCommandInteraction',
+    'setComponentsState',
+    ...(hasButtons ? ['routeButtonInteraction'] : []),
+    ...(hasSelectMenus ? ['routeSelectMenuInteraction'] : []),
+    ...(dbEnabled ? ['createDbClient'] : []),
+  ];
+}
+
+function buildComponentsStateFields(hasButtons: boolean, hasSelectMenus: boolean): string {
+  return [
+    ...(hasButtons ? ['buttons'] : []),
+    ...(hasSelectMenus ? ['selectMenus'] : []),
+    'argsSplitter: config.argsSplitter',
+  ].join(', ');
+}
+
+/**
+ * buttons/selectMenusが両方無い場合、coreOptionは誰にも参照されず未使用変数になる
+ * (noUnusedLocals対策)。coreClassのグローバル状態自体はcreateCoreStoreの呼び出しだけで
+ * 初期化される(coreStore.create()等は`disbord`からimportする別の仕組みのため、
+ * ローカル変数を経由しない)ので、副作用の呼び出しだけ残す形にする。
+ */
+function buildCoreOptionBlock(needsCoreOption: boolean, coreCreateArgs: string): string {
+  if (!needsCoreOption) {
+    return `  if (config.coreClass?.enable) {
+    createCoreStore(config.coreClass.instanceLevel ?? 'guild'${coreCreateArgs});
+  }
+
+`;
+  }
+  return `  const coreStore = config.coreClass?.enable
+    ? createCoreStore(config.coreClass.instanceLevel ?? 'guild'${coreCreateArgs})
+    : undefined;
+  const coreOption = coreStore ? { store: coreStore, nullMessage: config.coreClass!.nullMessage } : undefined;
+
+`;
+}
 
 export function generateMainSource(eventNames: string[], options: GenerateMainSourceOptions = {}): string {
   const origin = options.origin ?? 'dev';
   const dbEnabled = options.dbEnabled ?? false;
   const coreClassName = options.coreClassName;
+  const hasButtons = options.hasButtons ?? false;
+  const hasSelectMenus = options.hasSelectMenus ?? false;
 
   const eventImports = eventNames
     .map((name) => `import ${handlerIdentifier(name)} from '../src/events/${name}';`)
@@ -58,22 +142,25 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
     .map((name) => `  client.on(${eventBindingTarget(name)}, ${handlerIdentifier(name)});`)
     .join('\n');
 
-  const disbordImports = [
-    'type Config',
-    'createCoreStore',
-    'handleBotError',
-    'routeButtonInteraction',
-    'routeSelectMenuInteraction',
-    'routeSlashCommandInteraction',
-    'setComponentsState',
-    ...(dbEnabled ? ['createDbClient'] : []),
-  ];
-  const schemaImport = dbEnabled ? `\nimport { schema } from './db/schema';` : '';
-  const dbInit = dbEnabled
-    ? `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`
-    : '';
-  const coreClassImport = coreClassName ? `\nimport { ${coreClassName} } from '../src/${coreClassName}';` : '';
-  const coreCreateArgs = coreClassName ? `, () => new ${coreClassName}(), config.coreClass.instanceInvalidMessage` : '';
+  const disbordImports = buildDisbordImports(dbEnabled, hasButtons, hasSelectMenus);
+  const buttonsImport = optionalLine(hasButtons, `\nimport buttons from '../src/components/buttons';`);
+  const selectMenusImport = optionalLine(hasSelectMenus, `\nimport selectMenus from '../src/components/selectMenus';`);
+  const schemaImport = optionalLine(dbEnabled, `\nimport { schema } from './db/schema';`);
+  const dbInit = optionalLine(
+    dbEnabled,
+    `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`,
+  );
+  const coreClassImport = optionalLine(
+    Boolean(coreClassName),
+    `\nimport { ${coreClassName} } from '../src/${coreClassName}';`,
+  );
+  const coreCreateArgs = optionalLine(
+    Boolean(coreClassName),
+    `, () => new ${coreClassName}(), config.coreClass.instanceInvalidMessage`,
+  );
+
+  const componentsStateFields = buildComponentsStateFields(hasButtons, hasSelectMenus);
+  const coreOptionBlock = buildCoreOptionBlock(hasButtons || hasSelectMenus, coreCreateArgs);
 
   return `// AUTO-GENERATED by \`disbord ${origin}\`. Do not edit — regenerated on every restart.
 import { Client, Events } from 'discord.js';
@@ -81,36 +168,21 @@ import {
   ${disbordImports.join(',\n  ')},
 } from 'disbord';
 import rawConfig from '../disbord.config';
-import buttons from '../src/components/buttons';
-import selectMenus from '../src/components/selectMenus';
-import slashCommands from '../src/components/slashCommands';${schemaImport}${coreClassImport}
+import slashCommands from '../src/components/slashCommands';${buttonsImport}${selectMenusImport}${schemaImport}${coreClassImport}
 ${eventImports}
 
 async function main() {
   // satisfiesの推論型(disbord.config.ts側のexcess property check維持のため)をConfigへ広げる
   const config = rawConfig as Config;
 
-${dbInit}  setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });
+${dbInit}  setComponentsState({ ${componentsStateFields} });
 
   const client = new Client({ intents: config.intents });
 
-  const coreStore = config.coreClass?.enable
-    ? createCoreStore(config.coreClass.instanceLevel ?? 'guild'${coreCreateArgs})
-    : undefined;
-  const coreOption = coreStore ? { store: coreStore, nullMessage: config.coreClass!.nullMessage } : undefined;
-
-  client.on(Events.InteractionCreate, async (interaction) => {
+${coreOptionBlock}  client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isRepliable()) return;
     try {
-      if (interaction.isChatInputCommand()) {
-        await routeSlashCommandInteraction(interaction, slashCommands);
-      } else if (interaction.isButton()) {
-        await routeButtonInteraction(interaction, buttons, coreOption as never, { argsSplitter: config.argsSplitter });
-      } else if (interaction.isStringSelectMenu()) {
-        await routeSelectMenuInteraction(interaction, selectMenus, coreOption as never, {
-          argsSplitter: config.argsSplitter,
-        });
-      }
+${buildInteractionRouting(hasButtons, hasSelectMenus)}
     } catch (error) {
       await handleBotError(error, interaction, config.botErrorMessage);
     }

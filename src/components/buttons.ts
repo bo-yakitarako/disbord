@@ -54,6 +54,11 @@ type Registration = RegistryOf<'buttons', ButtonRegistration<any>>;
 
 export function makeButtonRow(...items: ButtonRowItem<Registration>[]): ActionRowBuilder<ButtonBuilder> {
   const state = getComponentsState();
+  if (!state.buttons) {
+    throw new Error(
+      'disbord: src/components/buttons.tsが存在しません。`disbord generate component button`で生成してください。',
+    );
+  }
   return buildButtonRow(state.buttons as Registration, items, state.argsSplitter);
 }
 

@@ -11,9 +11,19 @@ describe('setComponentsState / getComponentsState', () => {
     setComponentsState({ buttons, selectMenus });
     expect(getComponentsState()).toEqual({ buttons, selectMenus });
   });
+
+  test('buttons/selectMenusは任意(両方省略してもthrowしない)', () => {
+    setComponentsState({ argsSplitter: '-' });
+    expect(getComponentsState()).toEqual({ argsSplitter: '-' });
+  });
 });
 
 describe('makeButtonRow (registrationを渡さない糖衣構文)', () => {
+  test('buttons.tsが未生成(setComponentsStateにbuttonsが渡されていない)場合はわかりやすいエラーでthrowする', () => {
+    setComponentsState({ selectMenus: {} });
+    expect(() => makeButtonRow('sample' as never)).toThrow(/disbord generate component button/);
+  });
+
   test('setComponentsStateで注入したbuttons registrationを暗黙解決して組み立てる', () => {
     const buttons: ButtonRegistration = {
       sample: { component: { label: 'サンプル', style: 'primary' }, async execute() {} },
@@ -134,6 +144,11 @@ describe('routeButtonInteraction', () => {
 });
 
 describe('makeSelectMenuRow (registrationを渡さない糖衣構文)', () => {
+  test('selectMenus.tsが未生成(setComponentsStateにselectMenusが渡されていない)場合はわかりやすいエラーでthrowする', () => {
+    setComponentsState({ buttons: {} });
+    expect(() => makeSelectMenuRow('pick' as never)).toThrow(/disbord generate component selectMenu/);
+  });
+
   test('setComponentsStateで注入したselectMenus registrationを暗黙解決して組み立てる', () => {
     const selectMenus: SelectMenuRegistration = {
       pick: { component: { options: [{ label: 'A', value: 'a' }] }, async execute() {} },

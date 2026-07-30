@@ -53,6 +53,11 @@ export function makeSelectMenuRow<K extends keyof Registration>(
   ...args: ComponentArgs<Registration[K]['component']>
 ): ActionRowBuilder<StringSelectMenuBuilder> {
   const state = getComponentsState();
+  if (!state.selectMenus) {
+    throw new Error(
+      'disbord: src/components/selectMenus.tsが存在しません。`disbord generate component selectMenu`で生成してください。',
+    );
+  }
   return buildSelectMenuRow(state.selectMenus as Registration, key, args, state.argsSplitter);
 }
 

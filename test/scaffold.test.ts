@@ -26,7 +26,7 @@ describe('generatePackageJson', () => {
     expect(content.dependencies.disbord).toBe('^2.0.3');
   });
 
-  test('dev以外のnpm scripts(build/once/fmt/lint/gen:event/gen:once/enable/disable/env/encrypt/decrypt/help)も含む', () => {
+  test('dev以外のnpm scripts(build/once/fmt/lint/gen:event/gen:once/gen:component/enable/disable/env/encrypt/decrypt/help)も含む', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.scripts.build).toBe('disbord build');
     expect(content.scripts.once).toBe('disbord once');
@@ -34,6 +34,7 @@ describe('generatePackageJson', () => {
     expect(content.scripts.lint).toBe('oxlint -c oxlint.config.ts --fix');
     expect(content.scripts['gen:event']).toBe('disbord generate event');
     expect(content.scripts['gen:once']).toBe('disbord generate once');
+    expect(content.scripts['gen:component']).toBe('disbord generate component');
     expect(content.scripts.enable).toBe('disbord enable');
     expect(content.scripts.disable).toBe('disbord disable');
     expect(content.scripts.env).toBe('disbord env');
@@ -48,11 +49,12 @@ describe('generatePackageJson', () => {
     expect(keys.indexOf('once')).toBe(keys.indexOf('build') + 1);
   });
 
-  test('gen:onceはgen:eventの直後、enable/disableはgen:onceの直後に並ぶ', () => {
+  test('gen:onceはgen:eventの直後、gen:componentはgen:onceの直後、enable/disableはgen:componentの直後に並ぶ', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     const keys = Object.keys(content.scripts);
     expect(keys.indexOf('gen:once')).toBe(keys.indexOf('gen:event') + 1);
-    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:once') + 1);
+    expect(keys.indexOf('gen:component')).toBe(keys.indexOf('gen:once') + 1);
+    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:component') + 1);
     expect(keys.indexOf('disable')).toBe(keys.indexOf('enable') + 1);
   });
 
@@ -204,11 +206,27 @@ describe('generateDisbordDts', () => {
     expect(source).not.toContain(`from '@/Core'`);
   });
 
-  test('components importは@/絶対パスを使う', () => {
+  test('components importは@/絶対パスを使う(buttons/selectMenus省略時はtrue扱い)', () => {
     const source = generateDisbordDts({ db: false, coreClass: false });
     expect(source).toContain(`from '@/components/buttons'`);
     expect(source).toContain(`from '@/components/selectMenus'`);
     expect(source).toContain(`from '@/components/slashCommands'`);
+  });
+
+  test('slashCommandsは常に必須(buttons/selectMenusをfalseにしても含まれる)', () => {
+    const source = generateDisbordDts({ db: false, coreClass: false, buttons: false, selectMenus: false });
+    expect(source).toContain(`from '@/components/slashCommands'`);
+    expect(source).toContain('slashCommands: typeof slashCommands;');
+  });
+
+  test('buttons: falseの場合はbuttons関連のimport・Registryフィールドを一切含まない', () => {
+    const source = generateDisbordDts({ db: false, coreClass: false, buttons: false });
+    expect(source).not.toContain('buttons');
+  });
+
+  test('selectMenus: falseの場合はselectMenus関連のimport・Registryフィールドを一切含まない', () => {
+    const source = generateDisbordDts({ db: false, coreClass: false, selectMenus: false });
+    expect(source).not.toContain('selectMenus');
   });
 
   test('envKeys未指定・空配列時はNodeJS.ProcessEnvのaugmentationを含まない', () => {

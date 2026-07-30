@@ -1,8 +1,31 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { generateMainSource, scanEventFiles } from '../src/cli/generate';
+import { generateMainSource, scanComponentFiles, scanEventFiles } from '../src/cli/generate';
 
 const FIXTURES_DIR = join(import.meta.dir, 'fixtures');
+
+describe('scanComponentFiles', () => {
+  test('buttons.ts/selectMenus.tsが両方存在する場合はhasButtons/hasSelectMenusともにtrue', () => {
+    expect(scanComponentFiles(join(FIXTURES_DIR, 'components-both'))).toEqual({
+      hasButtons: true,
+      hasSelectMenus: true,
+    });
+  });
+
+  test('buttons.tsだけ存在する場合はhasButtonsのみtrue', () => {
+    expect(scanComponentFiles(join(FIXTURES_DIR, 'components-buttons-only'))).toEqual({
+      hasButtons: true,
+      hasSelectMenus: false,
+    });
+  });
+
+  test('ディレクトリ自体が存在しない場合も両方false(src/components/未作成のbotでも落ちないように)', () => {
+    expect(scanComponentFiles(join(FIXTURES_DIR, 'components-does-not-exist'))).toEqual({
+      hasButtons: false,
+      hasSelectMenus: false,
+    });
+  });
+});
 
 describe('scanEventFiles', () => {
   test('src/events/直下の.tsファイル名(拡張子抜き)をソート済みで返す', () => {
@@ -52,11 +75,60 @@ describe('generateMainSource', () => {
   });
 
   test('componentsは静的importされる(events同様、bundleでの解決を優先するため)', () => {
-    const source = generateMainSource([]);
+    const source = generateMainSource([], { hasButtons: true, hasSelectMenus: true });
     expect(source).toContain(`import buttons from '../src/components/buttons';`);
     expect(source).toContain(`import selectMenus from '../src/components/selectMenus';`);
     expect(source).toContain(`import slashCommands from '../src/components/slashCommands';`);
     expect(source).not.toContain('await import(');
+  });
+
+  test('slashCommandsは常に必須で静的importされる(hasButtons/hasSelectMenus省略時)', () => {
+    const source = generateMainSource([]);
+    expect(source).toContain(`import slashCommands from '../src/components/slashCommands';`);
+  });
+
+  test('hasButtons/hasSelectMenus省略時(デフォルトfalse)はbuttons/selectMenusのimport・ルーティング・setComponentsStateへの受け渡しを一切含まない', () => {
+    const source = generateMainSource([]);
+    expect(source).not.toContain(`from '../src/components/buttons'`);
+    expect(source).not.toContain(`from '../src/components/selectMenus'`);
+    expect(source).not.toContain('routeButtonInteraction');
+    expect(source).not.toContain('routeSelectMenuInteraction');
+    expect(source).not.toContain('isButton()');
+    expect(source).not.toContain('isStringSelectMenu()');
+    expect(source).toContain('setComponentsState({ argsSplitter: config.argsSplitter });');
+  });
+
+  test('hasButtons: trueのみの場合はbuttonsだけimport・ルーティングされる', () => {
+    const source = generateMainSource([], { hasButtons: true });
+    expect(source).toContain(`import buttons from '../src/components/buttons';`);
+    expect(source).toContain('routeButtonInteraction');
+    expect(source).not.toContain(`from '../src/components/selectMenus'`);
+    expect(source).not.toContain('routeSelectMenuInteraction');
+    expect(source).toContain('setComponentsState({ buttons, argsSplitter: config.argsSplitter });');
+  });
+
+  test('hasSelectMenus: trueのみの場合はselectMenusだけimport・ルーティングされる', () => {
+    const source = generateMainSource([], { hasSelectMenus: true });
+    expect(source).toContain(`import selectMenus from '../src/components/selectMenus';`);
+    expect(source).toContain('routeSelectMenuInteraction');
+    expect(source).not.toContain(`from '../src/components/buttons'`);
+    expect(source).not.toContain('routeButtonInteraction');
+    expect(source).toContain('setComponentsState({ selectMenus, argsSplitter: config.argsSplitter });');
+  });
+
+  test('buttons/selectMenusが両方無い場合、coreClass有効時もcoreOptionというローカル変数は作らずcreateCoreStoreの呼び出しだけ残す(noUnusedLocals対策)', () => {
+    const source = generateMainSource([], { coreClassName: 'Core' });
+    expect(source).not.toContain('const coreOption');
+    expect(source).not.toContain('const coreStore');
+    expect(source).toContain(`if (config.coreClass?.enable) {
+    createCoreStore(config.coreClass.instanceLevel ?? 'guild', () => new Core(), config.coreClass.instanceInvalidMessage);
+  }`);
+  });
+
+  test('buttons/selectMenusのどちらかが有る場合はcoreOption/coreStoreを通常通り組み立てる', () => {
+    const source = generateMainSource([], { hasButtons: true, coreClassName: 'Core' });
+    expect(source).toContain('const coreStore = config.coreClass?.enable');
+    expect(source).toContain('const coreOption = coreStore ?');
   });
 
   test('slashCommandのREST登録は一切含まない(disbord commands pushが唯一の登録手段のため)', () => {
@@ -74,7 +146,7 @@ describe('generateMainSource', () => {
   });
 
   test('setComponentsStateはClient生成より前に呼ばれる', () => {
-    const source = generateMainSource([]);
+    const source = generateMainSource([], { hasButtons: true, hasSelectMenus: true });
     expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
     const setStateIdx = source.indexOf('setComponentsState(');
     const clientIdx = source.indexOf('new Client(');
@@ -85,7 +157,7 @@ describe('generateMainSource', () => {
     for (const origin of ['dev', 'build'] as const) {
       for (const dbEnabled of [true, false]) {
         const source = generateMainSource([], { origin, dbEnabled });
-        expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
+        expect(source).toContain('setComponentsState(');
       }
     }
   });
@@ -97,7 +169,7 @@ describe('generateMainSource', () => {
   });
 
   test('coreOptionはbutton/selectMenuルーティングにのみ渡り、slashCommandには渡らない', () => {
-    const source = generateMainSource([]);
+    const source = generateMainSource([], { hasButtons: true, hasSelectMenus: true });
     expect(source).toContain(
       'routeButtonInteraction(interaction, buttons, coreOption as never, { argsSplitter: config.argsSplitter });',
     );
@@ -107,7 +179,7 @@ describe('generateMainSource', () => {
   });
 
   test('button/selectMenuルーティングにはargsSplitterがconfigから渡る', () => {
-    const source = generateMainSource([]);
+    const source = generateMainSource([], { hasButtons: true, hasSelectMenus: true });
     expect(source).toContain('argsSplitter: config.argsSplitter');
   });
 

@@ -23,6 +23,10 @@ const COMMANDS: CommandHelp[] = [
   { usage: 'disbord generate event <name>', description: 'イベントハンドラを追加生成する' },
   { usage: 'disbord generate once <name>', description: 'src/once/<name>.tsのひな形を追加生成する' },
   {
+    usage: 'disbord generate component <button|selectMenu>',
+    description: 'src/components/buttons.ts・selectMenus.tsを追加生成する（未生成なら任意で追加できる）',
+  },
+  {
     usage: 'disbord once <name> [--production]',
     description: 'src/once/<name>.tsをbotとして1回だけ起動して実行する',
   },

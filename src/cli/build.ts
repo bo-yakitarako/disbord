@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
-import { generateMainSource, scanEventFiles } from './generate';
+import { generateMainSource, scanComponentFiles, scanEventFiles } from './generate';
 import { generateOnceMainSource, scanOnceFiles } from './generateOnceMain';
 import { readBotConfig } from './readBotConfig';
 import { regenerateSchemaFile } from './schemaGen';
@@ -89,7 +89,13 @@ async function buildOnceScripts(
 async function buildMainEntry(
   cwd: string,
   eventNames: string[],
-  options: { dbEnabled: boolean; coreClassName?: string; external: string[] },
+  options: {
+    dbEnabled: boolean;
+    coreClassName?: string;
+    hasButtons: boolean;
+    hasSelectMenus: boolean;
+    external: string[];
+  },
 ): Promise<void> {
   writeFileSync(
     join(cwd, '.disbord/main.ts'),
@@ -97,6 +103,8 @@ async function buildMainEntry(
       origin: 'build',
       dbEnabled: options.dbEnabled,
       coreClassName: options.coreClassName,
+      hasButtons: options.hasButtons,
+      hasSelectMenus: options.hasSelectMenus,
     }),
   );
 
@@ -123,6 +131,7 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
   const coreClassName = config.coreClass?.enable ? config.coreClass.className : undefined;
+  const { hasButtons, hasSelectMenus } = scanComponentFiles(join(cwd, 'src/components'));
 
   // dev.tsと同様、`.disbord/`ごと削除されていてもbuild単体でdisbord.d.tsを再構築できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
@@ -137,7 +146,13 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
     external.add('@libsql/client');
   }
 
-  await buildMainEntry(cwd, eventNames, { dbEnabled, coreClassName, external: [...external] });
+  await buildMainEntry(cwd, eventNames, {
+    dbEnabled,
+    coreClassName,
+    hasButtons,
+    hasSelectMenus,
+    external: [...external],
+  });
 
   const onceNames = scanOnceFiles(join(cwd, 'src/once'));
   await buildOnceScripts(cwd, onceNames, { dbEnabled, coreClassName, external: [...external] });

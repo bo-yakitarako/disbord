@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Config } from '../config';
 import { collectEnvKeyTypes } from './envTypes';
+import { scanComponentFiles } from './generate';
 import { generateDisbordDts } from './scaffold';
 
 /**
@@ -19,7 +20,11 @@ export function regenerateDisbordDts(
 ): void {
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
   const envKeys = collectEnvKeyTypes(cwd);
-  writeFileSync(join(cwd, '.disbord/disbord.d.ts'), generateDisbordDts({ db, coreClass, coreClassName, envKeys }));
+  const { hasButtons, hasSelectMenus } = scanComponentFiles(join(cwd, 'src/components'));
+  writeFileSync(
+    join(cwd, '.disbord/disbord.d.ts'),
+    generateDisbordDts({ db, coreClass, coreClassName, envKeys, buttons: hasButtons, selectMenus: hasSelectMenus }),
+  );
 }
 
 /**
