@@ -13,6 +13,8 @@ describe('buildHelpText', () => {
       'disbord env encrypt',
       'disbord env decrypt',
       'disbord generate event <name>',
+      'disbord generate once <name>',
+      'disbord once <name>',
       'disbord generate model <Name>',
       'disbord migrate',
       'disbord studio',
@@ -28,6 +30,8 @@ describe('buildHelpText', () => {
     expect(text).not.toContain('disbord studio');
     expect(text).toContain('disbord dev');
     expect(text).toContain('disbord generate event <name>');
+    expect(text).toContain('disbord generate once <name>');
+    expect(text).toContain('disbord once <name>');
   });
 
   test('dbEnabled省略時はfalse相当(migrate/generate model/studioを含まない)', () => {

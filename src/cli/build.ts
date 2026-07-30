@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { generateMainSource, scanEventFiles } from './generate';
+import { generateOnceMainSource, scanOnceFiles } from './generateOnceMain';
 import { readBotConfig } from './readBotConfig';
 import { regenerateSchemaFile } from './schemaGen';
 
@@ -27,6 +28,81 @@ export function parseBuildArgs(args: (string | undefined)[]): { external: string
   return { external };
 }
 
+/**
+ * `src/once/*.ts`ごとに`.disbord/once/<name>.ts`（実実行ファイル）を生成し、個別に
+ * `dist/<name>.js`（main.jsと同じdist直下）へbundleする。runBuild本体の複雑度
+ * (oxlint complexity)を抑えるため分離している。
+ */
+async function buildOnceScripts(
+  cwd: string,
+  onceNames: string[],
+  options: { dbEnabled: boolean; coreClassName?: string; external: string[] },
+): Promise<void> {
+  if (onceNames.length === 0) return;
+
+  mkdirSync(join(cwd, '.disbord/once'), { recursive: true });
+  for (const name of onceNames) {
+    const mainPath = join(cwd, `.disbord/once/${name}.ts`);
+    writeFileSync(
+      mainPath,
+      generateOnceMainSource(name, {
+        origin: 'build',
+        dbEnabled: options.dbEnabled,
+        coreClassName: options.coreClassName,
+      }),
+    );
+
+    const result = await Bun.build({
+      entrypoints: [mainPath],
+      outdir: join(cwd, 'dist'),
+      target: 'bun',
+      minify: true,
+      external: options.external,
+      banner: BUILD_BUNDLE_BANNER,
+    });
+    if (!result.success) {
+      for (const log of result.logs) {
+        console.error(log);
+      }
+      throw new Error(`disbord: bun build（once/${name}）に失敗しました`);
+    }
+  }
+}
+
+/**
+ * `.disbord/main.ts`を生成し`dist/main.js`へbundleする。runBuild本体の複雑度
+ * (oxlint complexity)を抑えるため、buildOnceScriptsと同様に分離している。
+ */
+async function buildMainEntry(
+  cwd: string,
+  eventNames: string[],
+  options: { dbEnabled: boolean; coreClassName?: string; external: string[] },
+): Promise<void> {
+  writeFileSync(
+    join(cwd, '.disbord/main.ts'),
+    generateMainSource(eventNames, {
+      origin: 'build',
+      dbEnabled: options.dbEnabled,
+      coreClassName: options.coreClassName,
+    }),
+  );
+
+  const result = await Bun.build({
+    entrypoints: [join(cwd, '.disbord/main.ts')],
+    outdir: join(cwd, 'dist'),
+    target: 'bun',
+    minify: true,
+    external: options.external,
+    banner: BUILD_BUNDLE_BANNER,
+  });
+  if (!result.success) {
+    for (const log of result.logs) {
+      console.error(log);
+    }
+    throw new Error('disbord: bun buildに失敗しました');
+  }
+}
+
 export async function runBuild(cwd: string, options: { external?: string[] } = {}): Promise<void> {
   const eventNames = scanEventFiles(join(cwd, 'src/events'));
   mkdirSync(join(cwd, '.disbord'), { recursive: true });
@@ -43,30 +119,15 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
     await regenerateSchemaFile(cwd);
   }
 
-  writeFileSync(
-    join(cwd, '.disbord/main.ts'),
-    generateMainSource(eventNames, { origin: 'build', dbEnabled, coreClassName }),
-  );
-
   const external = new Set(options.external ?? []);
   if (dbEnabled) {
     external.add('@libsql/client');
   }
 
-  const result = await Bun.build({
-    entrypoints: [join(cwd, '.disbord/main.ts')],
-    outdir: join(cwd, 'dist'),
-    target: 'bun',
-    minify: true,
-    external: [...external],
-    banner: BUILD_BUNDLE_BANNER,
-  });
-  if (!result.success) {
-    for (const log of result.logs) {
-      console.error(log);
-    }
-    throw new Error('disbord: bun buildに失敗しました');
-  }
+  await buildMainEntry(cwd, eventNames, { dbEnabled, coreClassName, external: [...external] });
+
+  const onceNames = scanOnceFiles(join(cwd, 'src/once'));
+  await buildOnceScripts(cwd, onceNames, { dbEnabled, coreClassName, external: [...external] });
 
   const { text, exitCode } = await spawnDotenvxCapture(cwd, [
     'decrypt',
@@ -81,5 +142,8 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   }
   writeFileSync(join(cwd, 'dist/.env'), text);
 
-  console.log(`disbord: dist/main.js（${eventNames.length}イベント同梱・minify済み）と dist/.env を生成しました`);
+  const onceSummary = onceNames.length > 0 ? `、dist/直下に${onceNames.length}件のonceスクリプト` : '';
+  console.log(
+    `disbord: dist/main.js（${eventNames.length}イベント同梱・minify済み）と dist/.env${onceSummary}を生成しました`,
+  );
 }

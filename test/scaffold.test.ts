@@ -26,12 +26,14 @@ describe('generatePackageJson', () => {
     expect(content.dependencies.disbord).toBe('^1.0.0');
   });
 
-  test('dev以外のnpm scripts(build/fmt/lint/gen:event/enable/disable/env/encrypt/decrypt/help)も含む', () => {
+  test('dev以外のnpm scripts(build/once/fmt/lint/gen:event/gen:once/enable/disable/env/encrypt/decrypt/help)も含む', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     expect(content.scripts.build).toBe('disbord build');
+    expect(content.scripts.once).toBe('disbord once');
     expect(content.scripts.fmt).toBe('oxfmt --write src test');
     expect(content.scripts.lint).toBe('oxlint -c oxlint.config.ts --fix');
     expect(content.scripts['gen:event']).toBe('disbord generate event');
+    expect(content.scripts['gen:once']).toBe('disbord generate once');
     expect(content.scripts.enable).toBe('disbord enable');
     expect(content.scripts.disable).toBe('disbord disable');
     expect(content.scripts.env).toBe('disbord env');
@@ -40,10 +42,17 @@ describe('generatePackageJson', () => {
     expect(content.scripts.help).toBe('disbord help');
   });
 
-  test('enable/disableはgen:eventの直後に並ぶ', () => {
+  test('onceはbuildの直後に並ぶ', () => {
     const content = JSON.parse(generatePackageJson('my-bot'));
     const keys = Object.keys(content.scripts);
-    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:event') + 1);
+    expect(keys.indexOf('once')).toBe(keys.indexOf('build') + 1);
+  });
+
+  test('gen:onceはgen:eventの直後、enable/disableはgen:onceの直後に並ぶ', () => {
+    const content = JSON.parse(generatePackageJson('my-bot'));
+    const keys = Object.keys(content.scripts);
+    expect(keys.indexOf('gen:once')).toBe(keys.indexOf('gen:event') + 1);
+    expect(keys.indexOf('enable')).toBe(keys.indexOf('gen:once') + 1);
     expect(keys.indexOf('disable')).toBe(keys.indexOf('enable') + 1);
   });
 
@@ -292,12 +301,13 @@ describe('generateReadme', () => {
     expect(content).not.toContain('bunx create-disbord-app');
   });
 
-  test('disbord.config.ts/CLIコマンド/components/events/Core機構/DB層/エラーハンドリング/lint節を含む', () => {
+  test('disbord.config.ts/CLIコマンド/components/events/once/Core機構/DB層/エラーハンドリング/lint節を含む', () => {
     const content = generateReadme('my-bot');
     expect(content).toContain('## `disbord.config.ts`');
     expect(content).toContain('## CLIコマンド');
     expect(content).toContain('## components（`src/components/`）');
     expect(content).toContain('## events（`src/events/`）');
+    expect(content).toContain('## once（`src/once/`）');
     expect(content).toContain('## Core機構');
     expect(content).toContain('## DB層（`src/db/models/`）');
     expect(content).toContain('## エラーハンドリング');

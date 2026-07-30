@@ -21,6 +21,11 @@ const COMMANDS: CommandHelp[] = [
       'env/配下の環境変数を復号する（toggleと違い常に復号のみ行う。--allはdevelopment/production両方を並列に復号する）',
   },
   { usage: 'disbord generate event <name>', description: 'イベントハンドラを追加生成する' },
+  { usage: 'disbord generate once <name>', description: 'src/once/<name>.tsのひな形を追加生成する' },
+  {
+    usage: 'disbord once <name> [--production]',
+    description: 'src/once/<name>.tsをbotとして1回だけ起動して実行する',
+  },
   {
     usage: 'disbord generate model <Name>',
     description: 'src/db/models/にdecorator付きのモデルクラスを追加生成する',

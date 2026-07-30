@@ -7,8 +7,10 @@ import { parseEnableArgs, runEnable } from './enable';
 import { parseEnvArgs, runEnvAction, runEnvActionAll, runEnvToggle, runEnvToggleAll } from './env';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
+import { runGenerateOnce } from './generateOnce';
 import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
+import { parseOnceArgs, runOnce } from './once';
 import { readBotConfig } from './readBotConfig';
 import { runStudio } from './studio';
 import { getDisbordVersion } from './version';
@@ -32,6 +34,8 @@ const IMPLEMENTED_COMMANDS = [
   'env decrypt',
   'generate event',
   'generate model',
+  'generate once',
+  'once',
   'migrate',
   'studio',
   'enable',
@@ -87,7 +91,21 @@ async function dispatch(): Promise<number> {
       await runGenerateModel(rest[0], process.cwd());
       return 0;
     }
-    throw new Error('disbord: 使い方: disbord generate event <name> | disbord generate model <Name>');
+    if (sub === 'once' && rest[0]) {
+      await runGenerateOnce(rest[0], process.cwd());
+      return 0;
+    }
+    throw new Error(
+      'disbord: 使い方: disbord generate event <name> | disbord generate model <Name> | disbord generate once <name>',
+    );
+  }
+
+  if (command === 'once') {
+    if (!sub) {
+      throw new Error('disbord: 使い方: disbord once <name> [--production]');
+    }
+    const { production } = parseOnceArgs(rest);
+    return runOnce(sub, production, process.cwd());
   }
 
   if (command === 'migrate') {
@@ -121,6 +139,8 @@ async function dispatch(): Promise<number> {
     'commands delete',
     'generate event',
     'generate model',
+    'generate once',
+    'once',
     'migrate',
     'studio',
     'enable',

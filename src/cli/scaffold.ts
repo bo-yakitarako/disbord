@@ -41,11 +41,13 @@ export function generatePackageJson(name: string): string {
         scripts: {
           dev: 'disbord dev',
           build: 'disbord build',
+          once: 'disbord once',
           fmt: 'oxfmt --write src test',
           lint: 'oxlint -c oxlint.config.ts --fix',
           commands: 'disbord commands push',
           'commands:delete': 'disbord commands delete',
           'gen:event': 'disbord generate event',
+          'gen:once': 'disbord generate once',
           enable: 'disbord enable',
           disable: 'disbord disable',
           env: 'disbord env',
@@ -369,6 +371,8 @@ export default {
 | \`disbord env encrypt [--production\\|--all]\` | \`env/\`配下を暗号化する（固定） |
 | \`disbord env decrypt [--production\\|--all]\` | \`env/\`配下を復号する（固定） |
 | \`disbord generate event <name>\` | \`src/events/<name>.ts\`のひな形を追加生成する |
+| \`disbord generate once <name>\` | \`src/once/<name>.ts\`のひな形を追加生成する |
+| \`disbord once <name> [--production]\` | \`src/once/<name>.ts\`をbotとして1回だけ起動して実行する |
 | \`disbord generate model <Name>\` | \`src/db/models/<Name>.ts\`にdecorator付きモデルクラスを追加生成する（DB有効時のみ） |
 | \`disbord migrate [--production]\` | モデル定義から\`schema.ts\`・migrationファイルを生成し、DBに適用する（DB有効時のみ） |
 | \`disbord studio\` | \`.disbord/db/dev.db\`を対象にdrizzle studioサーバーを起動する（DB有効時のみ） |
@@ -415,6 +419,19 @@ import type { Message } from 'disbord';
 export default async function (message: Message) {
   if (message.author.bot) return;
 };
+\`\`\`
+
+## once（\`src/once/\`）
+
+常駐せず1回だけ処理を実行して終了するbot用の入り口です。\`disbord generate once <name>\`で\`src/once/<name>.ts\`を生成し、\`disbord once <name> [--production]\`で実行します（\`disbord build\`は\`dist/<name>.js\`としても出力します。\`main\`はbot本体のエントリ\`dist/main.js\`と衝突するため予約済みで使えません）。DB有効時は\`db\`/\`Model\`、coreClass有効時は\`coreStore\`もそのままimportして使えます。\`client.destroy()\`は実実行ファイル（\`.disbord/once/<name>.ts\`）側が自動で呼ぶため、\`src/once/<name>.ts\`側に書く必要はありません。
+
+\`\`\`ts
+// src/once/notice.ts
+import type { Client } from 'discord.js';
+
+export default async function (client: Client<true>) {
+  //
+}
 \`\`\`
 
 ## Core機構
