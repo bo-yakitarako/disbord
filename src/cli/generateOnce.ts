@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatGeneratedFile } from './formatGenerated';
 
 const RESERVED_ONCE_NAME = 'main';
 
@@ -26,5 +27,6 @@ export async function runGenerateOnce(name: string, cwd: string): Promise<void> 
 
   mkdirSync(join(cwd, 'src/once'), { recursive: true });
   writeFileSync(targetPath, generateOnceFileContent());
+  await formatGeneratedFile(cwd, targetPath);
   console.log(`disbord: src/once/${name}.ts を生成しました`);
 }

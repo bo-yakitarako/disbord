@@ -7,6 +7,7 @@ import {
   resolveEventParams,
   type EventParam,
 } from './clientEvents';
+import { formatGeneratedFile } from './formatGenerated';
 
 const RESERVED_EVENT_NAME = 'interactionCreate';
 
@@ -67,5 +68,6 @@ export async function runGenerateEvent(name: string, cwd: string): Promise<void>
 
   mkdirSync(join(cwd, 'src/events'), { recursive: true });
   writeFileSync(targetPath, content);
+  await formatGeneratedFile(cwd, targetPath);
   console.log(`disbord: src/events/${name}.ts を生成しました`);
 }

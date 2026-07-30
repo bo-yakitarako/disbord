@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatGeneratedFile } from './formatGenerated';
 import { generateButtonsStub, generateSelectMenusStub } from './scaffold';
 
 export type ComponentKind = 'button' | 'selectMenu';
@@ -22,6 +23,7 @@ export async function runGenerateComponent(kind: ComponentKind, cwd: string): Pr
 
   mkdirSync(join(cwd, 'src/components'), { recursive: true });
   writeFileSync(targetPath, generateComponentFileContent(kind));
+  await formatGeneratedFile(cwd, targetPath);
 
   console.log(`disbord: src/components/${fileName}.ts を生成しました`);
 }

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { toSnakeCase } from '../db/buildSchema';
+import { formatGeneratedFile } from './formatGenerated';
 import { readBotConfig } from './readBotConfig';
 
 function pluralize(word: string): string {
@@ -31,8 +32,8 @@ function toTableName(className: string): string {
 
 /**
  * Data型（Model.create()等の入力型）はnamespace/型ブロックとしてファイルへ書き戻す必要はない。
- * `class ${name} extends Model`のアクセサ宣言自体から`Model.ts`側が構造的に導出するため
- * （`ModelData<C> = UnwrapDayjs<Omit<C, keyof Model>>`参照）、生成後の動的import・追記は不要。
+ * `class ${name} extends Model`のアクセサ宣言自体から構造的に導出されるため、
+ * 生成後の動的import・追記は不要。
  */
 export function generateModelFileContent(name: string): string {
   const tableName = toTableName(name);
@@ -59,6 +60,7 @@ export async function runGenerateModel(name: string, cwd: string): Promise<void>
 
   mkdirSync(join(cwd, 'src/db/models'), { recursive: true });
   writeFileSync(targetPath, generateModelFileContent(name));
+  await formatGeneratedFile(cwd, targetPath);
 
   console.log(`disbord: src/db/models/${name}.ts を生成しました`);
 }
