@@ -9,6 +9,19 @@ import { regenerateSchemaFile } from './schemaGen';
 
 export const BUILD_BUNDLE_BANNER = '/* disbord | MIT License | github.com/bo-yakitarako/disbord */';
 
+/**
+ * `dotenvx decrypt --stdout`は復号したKEY=VALUEの手前に、暗号化用の公開鍵バナーコメントと
+ * `DOTENV_PUBLIC_KEY_*`行、`# .env.production`のようなファイル名コメントも含めて出力する
+ * （実機確認済み。末尾にも余分な空行が付く）。dist/.envはbot実行時にそのまま読まれるだけの
+ * 素のenvファイルなので、この`# .env.*`行より下のKEY=VALUE部分だけを、末尾の改行1つに
+ * 揃えて残す。
+ */
+export function stripDotenvxEnvHeader(text: string): string {
+  const match = /^# \.env\.\S*[^\S\r\n]*\r?\n/m.exec(text);
+  const body = match ? text.slice(match.index + match[0].length) : text;
+  return `${body.trimEnd()}\n`;
+}
+
 export function parseBuildArgs(args: (string | undefined)[]): { external: string[] } {
   const external: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -140,7 +153,7 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   if (exitCode !== 0) {
     throw new Error('disbord: env/.env.production の復号に失敗しました（存在確認・dotenvx導入状況を確認してください）');
   }
-  writeFileSync(join(cwd, 'dist/.env'), text);
+  writeFileSync(join(cwd, 'dist/.env'), stripDotenvxEnvHeader(text));
 
   const onceSummary = onceNames.length > 0 ? `、dist/直下に${onceNames.length}件のonceスクリプト` : '';
   console.log(

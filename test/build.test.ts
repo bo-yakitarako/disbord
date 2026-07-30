@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BUILD_BUNDLE_BANNER, parseBuildArgs } from '../src/cli/build';
+import { BUILD_BUNDLE_BANNER, parseBuildArgs, stripDotenvxEnvHeader } from '../src/cli/build';
 
 describe('parseBuildArgs', () => {
   test('引数なし時はexternalが空配列', () => {
@@ -50,5 +50,31 @@ describe('BUILD_BUNDLE_BANNER', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('stripDotenvxEnvHeader', () => {
+  test('dotenvxの公開鍵バナー・DOTENV_PUBLIC_KEY行・# .env.*コメント行を取り除き、KEY=VALUE部分だけを残す', () => {
+    // dotenvx decrypt --stdoutは実際に末尾が改行2つ(空行1つ分)になる(実機確認済み)。
+    // それも1つに揃えられることをここで検証する。
+    const decrypted = [
+      '#/-------------------[DOTENV_PUBLIC_KEY]--------------------/',
+      '#/            public-key encryption for .env files          /',
+      '#/       [how it works](https://dotenvx.com/encryption)     /',
+      '#/----------------------------------------------------------/',
+      'DOTENV_PUBLIC_KEY_PRODUCTION="03319d23a48f83afddf87818b85c70956da82d374a47bc70213180a05fb104541a" # -fk ../.env.keys',
+      '',
+      '# .env.production',
+      'TOKEN=abc123',
+      'CLIENT_ID=xyz789',
+      '',
+      '',
+    ].join('\n');
+
+    expect(stripDotenvxEnvHeader(decrypted)).toBe('TOKEN=abc123\nCLIENT_ID=xyz789\n');
+  });
+
+  test('# .env.*行が見つからない場合も末尾の改行は1つに揃える(将来dotenvxの出力形式が変わった場合のフォールバック)', () => {
+    expect(stripDotenvxEnvHeader('TOKEN=abc123\nCLIENT_ID=xyz789\n\n\n')).toBe('TOKEN=abc123\nCLIENT_ID=xyz789\n');
   });
 });
