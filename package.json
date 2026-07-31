@@ -11,7 +11,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./lint": "./src/lint/index.ts",
+    "./lint": "./src/lint/index.js",
     "./scaffold": "./src/cli/scaffold.ts",
     "./prompt": "./src/cli/prompt.ts",
     "./utils": "./src/utils.ts"
