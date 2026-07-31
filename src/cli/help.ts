@@ -27,6 +27,10 @@ const COMMANDS: CommandHelp[] = [
     description: 'src/components/buttons.ts・selectMenus.tsを追加生成する（未生成なら任意で追加できる）',
   },
   {
+    usage: 'disbord generate workflow ssh',
+    description: '.github/workflows/deploy.yamlを（再）生成する（SSH+systemd userサービスへのデプロイ用）',
+  },
+  {
     usage: 'disbord once <name> [--production]',
     description: 'src/once/<name>.tsをbotとして1回だけ起動して実行する',
   },

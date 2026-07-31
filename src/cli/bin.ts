@@ -9,6 +9,7 @@ import { runGenerateComponent, type ComponentKind } from './generateComponent';
 import { runGenerateEvent } from './generateEvent';
 import { runGenerateModel } from './generateModel';
 import { runGenerateOnce } from './generateOnce';
+import { runGenerateWorkflowSsh } from './generateWorkflow';
 import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
 import { parseOnceArgs, runOnce } from './once';
@@ -37,6 +38,7 @@ const IMPLEMENTED_COMMANDS = [
   'generate model',
   'generate once',
   'generate component',
+  'generate workflow ssh',
   'once',
   'migrate',
   'studio',
@@ -101,8 +103,12 @@ async function dispatch(): Promise<number> {
       await runGenerateComponent(rest[0] as ComponentKind, process.cwd());
       return 0;
     }
+    if (sub === 'workflow' && rest[0] === 'ssh') {
+      await runGenerateWorkflowSsh(process.cwd());
+      return 0;
+    }
     throw new Error(
-      'disbord: 使い方: disbord generate event <name> | disbord generate model <Name> | disbord generate once <name> | disbord generate component <button|selectMenu>',
+      'disbord: 使い方: disbord generate event <name> | disbord generate model <Name> | disbord generate once <name> | disbord generate component <button|selectMenu> | disbord generate workflow ssh',
     );
   }
 
@@ -147,6 +153,7 @@ async function dispatch(): Promise<number> {
     'generate model',
     'generate once',
     'generate component',
+    'generate workflow ssh',
     'once',
     'migrate',
     'studio',

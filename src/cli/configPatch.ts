@@ -40,3 +40,31 @@ export function removeConfigBlock(source: string, key: 'coreClass' | 'db'): stri
   }
   return source.replace(pattern, '');
 }
+
+export const DEFAULT_TIMER_CRON = '*-*-* *:00:00';
+
+export function buildTimerConfigBlock(name: string, cron: string = DEFAULT_TIMER_CRON): string {
+  return `  timer: {\n    ${name}: '${cron}',\n  },\n`;
+}
+
+/**
+ * coreClass/dbと違いtimerは複数のonceスクリプト名をキーに持つ1つのオブジェクトのため、
+ * 既存ブロックがあれば末尾にキーを追記し、無ければ新規ブロックとして挿入する
+ * (`disbord generate once <name>`のたびに呼ばれる。1回目はブロック新設、2回目以降は追記になる)。
+ */
+export function addTimerEntry(source: string, name: string, cron: string = DEFAULT_TIMER_CRON): string {
+  const blockPattern = /^ *timer: \{([\s\S]*?)\n( *)\},\n/m;
+  const match = blockPattern.exec(source);
+  if (!match || match.index === undefined) {
+    return insertConfigBlock(source, buildTimerConfigBlock(name, cron));
+  }
+
+  const body = match[1] ?? '';
+  const indent = match[2] ?? '  ';
+  if (new RegExp(`^ *${name}: `, 'm').test(body)) {
+    throw new Error(`disbord: disbord.config.tsのtimerに${name}は既に存在します`);
+  }
+
+  const newBlock = `  timer: {${body}\n    ${name}: '${cron}',\n${indent}},\n`;
+  return source.slice(0, match.index) + newBlock + source.slice(match.index + match[0].length);
+}

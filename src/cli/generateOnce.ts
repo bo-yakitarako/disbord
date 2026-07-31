@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { addTimerEntry } from './configPatch';
 import { formatGeneratedFile } from './formatGenerated';
 
 const RESERVED_ONCE_NAME = 'main';
@@ -28,5 +29,11 @@ export async function runGenerateOnce(name: string, cwd: string): Promise<void> 
   mkdirSync(join(cwd, 'src/once'), { recursive: true });
   writeFileSync(targetPath, generateOnceFileContent());
   await formatGeneratedFile(cwd, targetPath);
-  console.log(`disbord: src/once/${name}.ts を生成しました`);
+
+  // `disbord generate workflow ssh`がtimer付きonceスクリプトのsystemd timerユニットを
+  // 生成する際の実行スケジュール値として参照するため、生成と同時にデフォルト値を登録しておく。
+  const configPath = join(cwd, 'disbord.config.ts');
+  writeFileSync(configPath, addTimerEntry(readFileSync(configPath, 'utf-8'), name));
+
+  console.log(`disbord: src/once/${name}.ts を生成し、disbord.config.tsのtimerに${name}を追加しました`);
 }

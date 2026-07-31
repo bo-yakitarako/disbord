@@ -1,9 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateOnceFileContent, runGenerateOnce } from '../src/cli/generateOnce';
+
+const BASE_CONFIG = `import type { Config } from 'disbord';
+
+export default {
+  intents: ['Guilds', 'GuildMessages'],
+  botErrorMessage: 'エラーが発生しました',
+} satisfies Config;
+`;
 
 describe('generateOnceFileContent', () => {
   test('Client<true>を引数に取るdefault export関数のひな形を返す(src/events/ready.tsと同じ形)', () => {
@@ -21,6 +29,7 @@ describe('runGenerateOnce', () => {
   test('src/once/<name>.tsを生成する', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
     try {
+      await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
       await runGenerateOnce('notice', dir);
       const targetPath = join(dir, 'src/once/notice.ts');
       expect(existsSync(targetPath)).toBe(true);
@@ -31,9 +40,22 @@ describe('runGenerateOnce', () => {
     }
   });
 
+  test('disbord.config.tsのtimerにデフォルトcron付きでnameを追加する', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
+    try {
+      await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
+      await runGenerateOnce('notice', dir);
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`timer: {\n    notice: '*-*-* *:00:00',\n  },`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('既に存在する場合は上書きせずthrowする', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
     try {
+      await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
       await runGenerateOnce('notice', dir);
       await expect(runGenerateOnce('notice', dir)).rejects.toThrow(/既に存在します/);
     } finally {

@@ -15,6 +15,7 @@ describe('buildHelpText', () => {
       'disbord generate event <name>',
       'disbord generate once <name>',
       'disbord once <name>',
+      'disbord generate workflow ssh',
       'disbord generate model <Name>',
       'disbord migrate',
       'disbord studio',
@@ -32,6 +33,7 @@ describe('buildHelpText', () => {
     expect(text).toContain('disbord generate event <name>');
     expect(text).toContain('disbord generate once <name>');
     expect(text).toContain('disbord once <name>');
+    expect(text).toContain('disbord generate workflow ssh');
   });
 
   test('dbEnabled省略時はfalse相当(migrate/generate model/studioを含まない)', () => {

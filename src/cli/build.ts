@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
@@ -39,6 +39,17 @@ export function parseBuildArgs(args: (string | undefined)[]): { external: string
     }
   }
   return { external };
+}
+
+/**
+ * `dist/mise.toml`の中身を組み立てる。ボット自身のルート`mise.toml`（bunバージョン固定用）を
+ * そのまま基礎にし、デプロイ先でsystemdサービスから`mise run main`/`mise run <once名>`で
+ * 起動できるよう`[tasks.*]`をmain・onceスクリプトの数だけ追記する
+ * （`disbord generate workflow ssh`が生成するservice/timerユニットのExecStartと対応する）。
+ */
+export function buildDistMiseToml(baseMiseToml: string, onceNames: string[]): string {
+  const taskBlocks = ['main', ...onceNames].map((name) => `[tasks.${name}]\nrun = 'bun ${name}.js'\n`);
+  return `${baseMiseToml.trimEnd()}\n\n${taskBlocks.join('\n')}`;
 }
 
 /**
@@ -157,6 +168,9 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   const onceNames = scanOnceFiles(join(cwd, 'src/once'));
   await buildOnceScripts(cwd, onceNames, { dbEnabled, coreClassName, external: [...external] });
 
+  const baseMiseToml = readFileSync(join(cwd, 'mise.toml'), 'utf-8');
+  writeFileSync(join(cwd, 'dist/mise.toml'), buildDistMiseToml(baseMiseToml, onceNames));
+
   const { text, exitCode } = await spawnDotenvxCapture(cwd, [
     'decrypt',
     '-f',
@@ -172,6 +186,6 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   const onceSummary = onceNames.length > 0 ? `、dist/直下に${onceNames.length}件のonceスクリプト` : '';
   console.log(
-    `disbord: dist/main.js（${eventNames.length}イベント同梱・minify済み）と dist/.env${onceSummary}を生成しました`,
+    `disbord: dist/main.js（${eventNames.length}イベント同梱・minify済み）と dist/.env・dist/mise.toml${onceSummary}を生成しました`,
   );
 }

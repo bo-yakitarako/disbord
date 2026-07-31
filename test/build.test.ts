@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BUILD_BUNDLE_BANNER, parseBuildArgs, stripDotenvxEnvHeader } from '../src/cli/build';
+import { buildDistMiseToml, BUILD_BUNDLE_BANNER, parseBuildArgs, stripDotenvxEnvHeader } from '../src/cli/build';
 
 describe('parseBuildArgs', () => {
   test('引数なし時はexternalが空配列', () => {
@@ -50,6 +50,22 @@ describe('BUILD_BUNDLE_BANNER', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('buildDistMiseToml', () => {
+  const BASE_MISE_TOML = `[tools]\nbun = "1.3.13"\n`;
+
+  test('onceスクリプトが無ければ[tasks.main]だけ追記する', () => {
+    expect(buildDistMiseToml(BASE_MISE_TOML, [])).toBe(
+      `[tools]\nbun = "1.3.13"\n\n[tasks.main]\nrun = 'bun main.js'\n`,
+    );
+  });
+
+  test('onceスクリプトの数だけ[tasks.<name>]を追記する(mise run <name>でsystemd oneshotから起動する)', () => {
+    expect(buildDistMiseToml(BASE_MISE_TOML, ['notice', 'cleanup'])).toBe(
+      `[tools]\nbun = "1.3.13"\n\n[tasks.main]\nrun = 'bun main.js'\n\n[tasks.notice]\nrun = 'bun notice.js'\n\n[tasks.cleanup]\nrun = 'bun cleanup.js'\n`,
+    );
   });
 });
 

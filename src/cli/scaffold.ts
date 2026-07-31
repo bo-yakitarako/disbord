@@ -49,6 +49,7 @@ export function generatePackageJson(name: string): string {
           'gen:event': 'disbord generate event',
           'gen:once': 'disbord generate once',
           'gen:component': 'disbord generate component',
+          'gen:workflow': 'disbord generate workflow',
           enable: 'disbord enable',
           disable: 'disbord disable',
           env: 'disbord env',
@@ -389,6 +390,7 @@ export default {
 | \`disbord generate event <name>\` | \`src/events/<name>.ts\`のひな形を追加生成する |
 | \`disbord generate once <name>\` | \`src/once/<name>.ts\`のひな形を追加生成する |
 | \`disbord generate component <button\\|selectMenu>\` | \`src/components/buttons.ts\`・\`selectMenus.ts\`を追加生成する（未生成なら） |
+| \`disbord generate workflow ssh\` | \`.github/workflows/deploy.yaml\`を（再）生成する（SSH+systemd userサービスへのデプロイ用） |
 | \`disbord once <name> [--production]\` | \`src/once/<name>.ts\`をbotとして1回だけ起動して実行する |
 | \`disbord generate model <Name>\` | \`src/db/models/<Name>.ts\`にdecorator付きモデルクラスを追加生成する（DB有効時のみ） |
 | \`disbord migrate [--production]\` | モデル定義から\`schema.ts\`・migrationファイルを生成し、DBに適用する（DB有効時のみ） |
@@ -488,6 +490,10 @@ export class Job extends Model {
 \`id\` / \`createdAt\` / \`updatedAt\`は全モデル共通で自動付与されます。\`Job.create()\`/\`find()\`/\`update()\`等の入力型（\`namespace Job { export type Data = ... }\`のような手書き・自動生成ブロック）は不要で、\`@Column\`/\`@Relate\`のaccessor宣言からクラス定義そのものを元に機械的に導出されます（\`timestamp_ms\`のaccessorだけは読み取り時\`Dayjs\`・書き込み時\`Date\`と非対称なため、その変換のみ\`disbord\`側で吸収します）。接続先はTurso用の環境変数の有無で自動判定され（未設定ならローカルsqlite\`.disbord/db/dev.db\`）、中身は\`disbord studio\`で確認できます。
 
 \`@Column\`の\`default\`オプションは値の種類でDB側/JS側どちらのdefaultになるか変わります。固定値（例: \`default: 'pending'\`）はDBスキーマの\`DEFAULT\`句として、関数（例: \`default: () => crypto.randomUUID()\`）はdrizzle-orm（JS側）がINSERT時に評価する値として扱われます（生SQLでのINSERTには効きません）。\`type\`/\`mode\`ごとに\`default\`の型も絞られており（例: \`mode: 'boolean'\`なら\`boolean\`のみ）、\`mode: 'timestamp_ms'\`のカラムは\`Date\`ではなく\`Dayjs\`（固定値・\`() => Dayjs\`関数どちらも）で指定します（DBへ渡す際は内部でDateへ変換されます）。さらに\`mode: 'timestamp_ms'\`のカラムに限り特別な値\`default: 'now'\`も使え、DB側の\`DEFAULT (unixepoch('subsec') * 1000)\`（挿入時刻のミリ秒unix時間）になります。ただしTypeScriptの\`accessor\`は\`?\`を付けたoptionalにできない言語仕様のため、\`Job.create()\`呼び出し時にこの値の指定を省略できるようにはなりません（DBやdrizzle-kit studio等から直接INSERTする場合にのみ効きます）。
+
+## デプロイ（\`.github/workflows/\`）
+
+\`disbord generate workflow ssh\`で\`.github/workflows/deploy.yaml\`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（\`--user\`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、\`disbord.config.ts\`の\`timer\`で指定したスケジュールで定期実行します。
 
 ## エラーハンドリング
 

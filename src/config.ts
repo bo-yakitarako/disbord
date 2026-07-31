@@ -22,4 +22,5 @@ export type Config = {
   };
   botErrorMessage: BotErrorMessage;
   argsSplitter?: string;
+  timer?: Record<string, string>;
 };
