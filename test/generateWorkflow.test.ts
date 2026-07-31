@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateDeployWorkflow, resolveOnceTimerEntries, runGenerateWorkflowSsh } from '../src/cli/generateWorkflow';
+import { generateLefthookConfig } from '../src/cli/scaffold';
 
 const BASE_CONFIG = `import type { Config } from 'disbord';
 
@@ -191,6 +193,45 @@ describe('runGenerateWorkflowSsh', () => {
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).toContain('my-bot');
       expect(content).not.toContain('- name: Deploy once timers');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('lefthook.ymlが存在すればencryptの直後にworkflowコマンドを追記する', async () => {
+    const dir = await setupDir();
+    try {
+      await writeFile(join(dir, 'lefthook.yml'), generateLefthookConfig());
+      await runGenerateWorkflowSsh(dir);
+      const lefthook = await readFile(join(dir, 'lefthook.yml'), 'utf-8');
+      expect(lefthook).toContain(
+        '    encrypt:\n      run: mise exec -- bun run encrypt -- --all\n      stage_fixed: true\n' +
+          '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml\n',
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('lefthook.ymlに既にworkflowコマンドがある場合は重複追記しない(複数回実行しても冪等)', async () => {
+    const dir = await setupDir();
+    try {
+      await writeFile(join(dir, 'lefthook.yml'), generateLefthookConfig());
+      await runGenerateWorkflowSsh(dir);
+      const once = await readFile(join(dir, 'lefthook.yml'), 'utf-8');
+      await runGenerateWorkflowSsh(dir);
+      const twice = await readFile(join(dir, 'lefthook.yml'), 'utf-8');
+      expect(twice).toBe(once);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('lefthook.ymlが存在しない場合は何もせずスキップする(deploy.yaml生成は失敗しない)', async () => {
+    const dir = await setupDir();
+    try {
+      await runGenerateWorkflowSsh(dir);
+      expect(existsSync(join(dir, 'lefthook.yml'))).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

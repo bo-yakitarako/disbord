@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scanOnceFiles } from './generateOnceMain';
+import { addWorkflowLefthookCommand } from './lefthookPatch';
 import { readBotConfig } from './readBotConfig';
 
 export type OnceTimerEntry = { name: string; cron: string };
@@ -199,5 +200,11 @@ export async function runGenerateWorkflowSsh(cwd: string): Promise<void> {
     join(cwd, '.github/workflows/deploy.yaml'),
     generateDeployWorkflow(pkg.name, onceEntries, Boolean(config.db?.enable)),
   );
+
+  const lefthookPath = join(cwd, 'lefthook.yml');
+  if (existsSync(lefthookPath)) {
+    writeFileSync(lefthookPath, addWorkflowLefthookCommand(readFileSync(lefthookPath, 'utf-8')));
+  }
+
   console.log('disbord: .github/workflows/deploy.yaml を生成しました');
 }

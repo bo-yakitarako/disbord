@@ -164,7 +164,7 @@ export class Job extends Model {
 
 ## デプロイ（`.github/workflows/`）
 
-`disbord generate workflow ssh`で`.github/workflows/deploy.yaml`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（`--user`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、`disbord.config.ts`の`timer`で指定したスケジュールで定期実行します。
+`disbord generate workflow ssh`で`.github/workflows/deploy.yaml`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（`--user`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、`disbord.config.ts`の`timer`で指定したスケジュールで定期実行します。`lefthook.yml`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
 
 ## エラーハンドリング
 
