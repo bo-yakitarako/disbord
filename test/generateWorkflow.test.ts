@@ -73,7 +73,7 @@ describe('resolveOnceTimerEntries', () => {
 
 describe('generateDeployWorkflow', () => {
   test('onceスクリプトが無い場合はDeploy service止まりで、once timersのステップは含まない', () => {
-    const content = generateDeployWorkflow('my-bot', []);
+    const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('name: Deploy');
     expect(content).toContain('- name: Checkout');
     expect(content).toContain('- name: Setup mise (bun)');
@@ -89,12 +89,29 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('env keysの書き込みはbuildより前に行う(buildがenv/.env.keys.productionを使って復号するため)', () => {
-    const content = generateDeployWorkflow('my-bot', []);
+    const content = generateDeployWorkflow('my-bot', [], false);
     expect(content.indexOf('- name: Write env keys')).toBeLessThan(content.indexOf('- name: Build'));
   });
 
+  test('dbEnabled: falseならMigrateステップを含まない', () => {
+    const content = generateDeployWorkflow('my-bot', [], false);
+    expect(content).not.toContain('- name: Migrate');
+    expect(content).not.toContain('bun run migrate --production');
+  });
+
+  test('dbEnabled: trueならBuildの直後にMigrateステップを挟む', () => {
+    const content = generateDeployWorkflow('my-bot', [], true);
+    expect(content).toContain('- name: Migrate');
+    expect(content).toContain('run: bun run migrate --production');
+    const buildIndex = content.indexOf('- name: Build');
+    const migrateIndex = content.indexOf('- name: Migrate');
+    const sshIndex = content.indexOf('- name: Setup SSH agent');
+    expect(buildIndex).toBeLessThan(migrateIndex);
+    expect(migrateIndex).toBeLessThan(sshIndex);
+  });
+
   test('systemdサービスの有無でrestart/新規作成+startを分岐する', () => {
-    const content = generateDeployWorkflow('my-bot', []);
+    const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('if [ -f ~/.config/systemd/user/my-bot.service ]; then');
     expect(content).toContain('systemctl --user restart my-bot');
     expect(content).toContain("cat > ~/.config/systemd/user/my-bot.service <<'UNIT'");
@@ -102,7 +119,7 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('メインサービスユニットの中身(WorkingDirectory/ExecStart等)', () => {
-    const content = generateDeployWorkflow('my-bot', []);
+    const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('Description=my-bot discord bot');
     expect(content).toContain('WorkingDirectory=${{ secrets.DEPLOY_PATH }}');
     expect(content).toContain('ExecStart=mise run main');
@@ -110,7 +127,7 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('onceスクリプトがある場合、Deploy once timersステップでservice/timerユニットを生成しenable --nowする', () => {
-    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }]);
+    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }], false);
     expect(content).toContain('- name: Deploy once timers');
     expect(content).toContain("cat > ~/.config/systemd/user/my-bot-notice.service <<'UNIT'");
     expect(content).toContain('ExecStart=mise run notice');
@@ -121,10 +138,14 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('onceスクリプトが複数ある場合、それぞれ分のservice/timer/enableを含む', () => {
-    const content = generateDeployWorkflow('my-bot', [
-      { name: 'notice', cron: '0 9 * * *' },
-      { name: 'cleanup', cron: '*-*-* *:00:00' },
-    ]);
+    const content = generateDeployWorkflow(
+      'my-bot',
+      [
+        { name: 'notice', cron: '0 9 * * *' },
+        { name: 'cleanup', cron: '*-*-* *:00:00' },
+      ],
+      false,
+    );
     expect(content).toContain('my-bot-notice.service');
     expect(content).toContain('my-bot-notice.timer');
     expect(content).toContain('my-bot-cleanup.service');
@@ -134,7 +155,7 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('有効なYAMLとしてパースでき、ヒアドキュメントの終端行(EOF/UNIT)がYAML側のインデント除去後に行頭へ揃う', () => {
-    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }]);
+    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }], false);
 
     type Step = { name: string; run?: string };
     const parsed = Bun.YAML.parse(content) as { jobs: { deploy: { steps: Step[] } } };
@@ -170,6 +191,23 @@ describe('runGenerateWorkflowSsh', () => {
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).toContain('my-bot');
       expect(content).not.toContain('- name: Deploy once timers');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('disbord.config.tsのdb.enableがtrueならMigrateステップを生成する', async () => {
+    const dir = await setupDir();
+    try {
+      await writeFile(
+        join(dir, 'disbord.config.ts'),
+        BASE_CONFIG.replace('botErrorMessage:', `db: { enable: true },\n  botErrorMessage:`),
+      );
+
+      await runGenerateWorkflowSsh(dir);
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).toContain('- name: Migrate');
+      expect(content).toContain('run: bun run migrate --production');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

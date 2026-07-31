@@ -132,7 +132,7 @@ function buildStep(name: string, runScript: string): string {
 ${indentLines(runScript, CONTENT_INDENT)}`;
 }
 
-export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEntry[]): string {
+export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEntry[], dbEnabled: boolean): string {
   const steps = [
     `      - name: Checkout
         uses: actions/checkout@v4`,
@@ -144,6 +144,12 @@ export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEn
         run: echo "\${{ secrets.ENV_KEYS }}" > env/.env.keys.production`,
     `      - name: Build
         run: bun run build`,
+    ...(dbEnabled
+      ? [
+          `      - name: Migrate
+        run: bun run migrate --production`,
+        ]
+      : []),
     `      - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -189,6 +195,9 @@ export async function runGenerateWorkflowSsh(cwd: string): Promise<void> {
   const onceEntries = resolveOnceTimerEntries(cwd, onceNames, config.timer);
 
   mkdirSync(join(cwd, '.github/workflows'), { recursive: true });
-  writeFileSync(join(cwd, '.github/workflows/deploy.yaml'), generateDeployWorkflow(pkg.name, onceEntries));
+  writeFileSync(
+    join(cwd, '.github/workflows/deploy.yaml'),
+    generateDeployWorkflow(pkg.name, onceEntries, Boolean(config.db?.enable)),
+  );
   console.log('disbord: .github/workflows/deploy.yaml を生成しました');
 }
