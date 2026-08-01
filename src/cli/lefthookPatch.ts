@@ -11,9 +11,15 @@ const WORKFLOW_COMMAND_MARKER = 'gen:workflow ssh';
  * 再ステージする仕組みのため、deploy.yamlを直接ステージしていないcommit（例:
  * disbord.config.tsだけをステージした場合）では効かない。ここでは`run:`内で
  * 明示的に`git add`することで、生成結果を確実に同じcommitへ含める。
+ *
+ * disbord.config.tsも合わせてgit addするのは、`disbord generate workflow ssh`（＝この
+ * gen:workflow ssh）がsrc/once配下の未登録timerをdisbord.config.tsへ書き足す副作用を持つため
+ * （generateWorkflow.ts参照）。deploy.yamlだけをステージすると、その副作用の書き込みが
+ * ステージされないままcommitに含まれず、次回commitまでdisbord.config.tsとdeploy.yamlの
+ * 内容が食い違った状態になってしまう。
  */
 export function buildWorkflowLefthookBlock(): string {
-  return `    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml\n`;
+  return `    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n`;
 }
 
 /**

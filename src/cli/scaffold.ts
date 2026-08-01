@@ -382,8 +382,8 @@ export default {
 | --- | --- |
 | \`disbord dev\` | 開発サーバーを起動する（\`bun --watch\`のラッパー。起動時にcommands push・（DB有効時）migrateを自動実行） |
 | \`disbord build\` | 本番デプロイ用に\`dist/main.js\`・\`dist/.env\`を生成する |
-| \`disbord commands push [--env development\\|production]\` | slashCommandをDiscordへREST登録する |
-| \`disbord commands delete [--env development\\|production]\` | 登録済みslashCommandを削除する |
+| \`disbord commands push [--production]\` | slashCommandをDiscordへREST登録する |
+| \`disbord commands delete [--production]\` | 登録済みslashCommandを削除する |
 | \`disbord env [--production\\|--all]\` | \`env/\`配下の環境変数を暗号化⇔復号にtoggleする |
 | \`disbord env encrypt [--production\\|--all]\` | \`env/\`配下を暗号化する（固定） |
 | \`disbord env decrypt [--production\\|--all]\` | \`env/\`配下を復号する（固定） |
@@ -493,7 +493,7 @@ export class Job extends Model {
 
 ## デプロイ（\`.github/workflows/\`）
 
-\`disbord generate workflow ssh\`で\`.github/workflows/deploy.yaml\`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（\`--user\`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、\`disbord.config.ts\`の\`timer\`で指定したスケジュールで定期実行します。\`lefthook.yml\`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
+\`disbord generate workflow ssh\`で\`.github/workflows/deploy.yaml\`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（\`--user\`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、\`disbord.config.ts\`の\`timer\`で指定したスケジュールで定期実行します（\`timer\`未設定のonceスクリプトには、このコマンド実行時にデフォルト値が自動で補完されます）。\`lefthook.yml\`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
 
 ## エラーハンドリング
 

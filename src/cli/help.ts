@@ -3,8 +3,8 @@ type CommandHelp = { usage: string; description: string; requiresDb?: boolean };
 const COMMANDS: CommandHelp[] = [
   { usage: 'disbord dev', description: '開発サーバーを起動する（bun --watchのラッパー）' },
   { usage: 'disbord build', description: '本番デプロイ用にdist/を生成する' },
-  { usage: 'disbord commands push [--env development|production]', description: 'slashCommandをDiscordへREST登録する' },
-  { usage: 'disbord commands delete [--env development|production]', description: '登録済みslashCommandを削除する' },
+  { usage: 'disbord commands push [--production]', description: 'slashCommandをDiscordへREST登録する' },
+  { usage: 'disbord commands delete [--production]', description: '登録済みslashCommandを削除する' },
   {
     usage: 'disbord env [--production|--all]',
     description:

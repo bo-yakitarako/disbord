@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateOnceFileContent, runGenerateOnce } from '../src/cli/generateOnce';
+import { generateDeployWorkflow } from '../src/cli/generateWorkflow';
 
 const BASE_CONFIG = `import type { Config } from 'disbord';
 
@@ -40,13 +41,44 @@ describe('runGenerateOnce', () => {
     }
   });
 
-  test('disbord.config.tsのtimerにデフォルトcron付きでnameを追加する', async () => {
+  test('SSHデプロイworkflow(.github/workflows/deploy.yaml、SSH_HOST参照)が既にある場合はdisbord.config.tsのtimerにデフォルトcron付きでnameを追加する', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
+    try {
+      await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
+      await mkdir(join(dir, '.github/workflows'), { recursive: true });
+      await writeFile(join(dir, '.github/workflows/deploy.yaml'), generateDeployWorkflow('my-bot', [], false));
+
+      await runGenerateOnce('notice', dir);
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`timer: {\n    notice: '*-*-* *:00:00',\n  },`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('.github/workflows/deploy.yamlが無い場合はtimerを追加しない(disbord generate workflow ssh実行時にsrc/once配下から補完する)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
     try {
       await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
       await runGenerateOnce('notice', dir);
       const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
-      expect(config).toContain(`timer: {\n    notice: '*-*-* *:00:00',\n  },`);
+      expect(config).toBe(BASE_CONFIG);
+      expect(config).not.toContain('timer:');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('deploy.yamlがあってもSSH_HOSTを参照しない(SSHデプロイ用でない)場合はtimerを追加しない', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-once-'));
+    try {
+      await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
+      await mkdir(join(dir, '.github/workflows'), { recursive: true });
+      await writeFile(join(dir, '.github/workflows/deploy.yaml'), 'name: Deploy\n');
+
+      await runGenerateOnce('notice', dir);
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).not.toContain('timer:');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

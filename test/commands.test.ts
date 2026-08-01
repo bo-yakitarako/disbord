@@ -22,8 +22,8 @@ describe('parseCommandsArgs', () => {
     expect(parseCommandsArgs(['push'])).toEqual({ action: 'push', envTarget: 'development' });
   });
 
-  test('--envでenvTargetを明示できる', () => {
-    expect(parseCommandsArgs(['delete', '--env', 'production'])).toEqual({
+  test('--productionでenvTargetを明示できる', () => {
+    expect(parseCommandsArgs(['delete', '--production'])).toEqual({
       action: 'delete',
       envTarget: 'production',
     });
@@ -34,13 +34,9 @@ describe('parseCommandsArgs', () => {
     expect(() => parseCommandsArgs([undefined])).toThrow();
   });
 
-  test('development/production以外の--env値はthrow', () => {
-    expect(() => parseCommandsArgs(['push', '--env', 'staging'])).toThrow();
-    expect(() => parseCommandsArgs(['push', '--env'])).toThrow();
-  });
-
   test('未知の余分な引数はthrow', () => {
     expect(() => parseCommandsArgs(['push', '--guild', '123'])).toThrow();
+    expect(() => parseCommandsArgs(['push', '--env', 'production'])).toThrow();
   });
 });
 

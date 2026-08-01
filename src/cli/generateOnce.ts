@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { addTimerEntry } from './configPatch';
 import { formatGeneratedFile } from './formatGenerated';
+import { hasSshDeployWorkflow } from './generateWorkflow';
 
 const RESERVED_ONCE_NAME = 'main';
 
@@ -30,10 +31,15 @@ export async function runGenerateOnce(name: string, cwd: string): Promise<void> 
   writeFileSync(targetPath, generateOnceFileContent());
   await formatGeneratedFile(cwd, targetPath);
 
-  // `disbord generate workflow ssh`がtimer付きonceスクリプトのsystemd timerユニットを
-  // 生成する際の実行スケジュール値として参照するため、生成と同時にデフォルト値を登録しておく。
-  const configPath = join(cwd, 'disbord.config.ts');
-  writeFileSync(configPath, addTimerEntry(readFileSync(configPath, 'utf-8'), name));
-
-  console.log(`disbord: src/once/${name}.ts を生成し、disbord.config.tsのtimerに${name}を追加しました`);
+  // SSH+systemdデプロイ(`disbord generate workflow ssh`)を使っていない状態でtimerを登録しても
+  // 参照先のsystemd timerユニットが無く意味を持たないため、`.github/workflows/deploy.yaml`が
+  // SSHデプロイ用として既に存在する場合のみデフォルト値を登録する。それ以外のケースでは
+  // `disbord generate workflow ssh`実行時にsrc/once配下の実ファイルから逆算して補完する。
+  if (hasSshDeployWorkflow(cwd)) {
+    const configPath = join(cwd, 'disbord.config.ts');
+    writeFileSync(configPath, addTimerEntry(readFileSync(configPath, 'utf-8'), name));
+    console.log(`disbord: src/once/${name}.ts を生成し、disbord.config.tsのtimerに${name}を追加しました`);
+  } else {
+    console.log(`disbord: src/once/${name}.ts を生成しました`);
+  }
 }

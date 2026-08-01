@@ -6,6 +6,10 @@ import { spawnWithDotenvx, type EnvTarget } from './dotenvxSpawn';
 
 export type CommandsAction = 'push' | 'delete';
 
+/**
+ * 対象はdevelopment/productionの二択のみのため、`disbord migrate`/`disbord env`と同じ流儀で
+ * `--env development|production`ではなく`--production`(省略時development)の形にしている。
+ */
 export function parseCommandsArgs(args: (string | undefined)[]): { action: CommandsAction; envTarget: EnvTarget } {
   const [action, ...rest] = args;
   if (action !== 'push' && action !== 'delete') {
@@ -13,19 +17,14 @@ export function parseCommandsArgs(args: (string | undefined)[]): { action: Comma
   }
 
   let envTarget: EnvTarget = 'development';
-  for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === '--env') {
-      const value = rest[i + 1];
-      if (value !== 'development' && value !== 'production') {
-        throw new Error(
-          `disbord: --envは"development"か"production"を指定してください（指定値: ${value ?? '(なし)'}）`,
-        );
-      }
-      envTarget = value;
-      i++;
+  for (const arg of rest) {
+    if (arg === '--production') {
+      envTarget = 'production';
       continue;
     }
-    throw new Error(`disbord: 不明な引数 "${rest[i]}"`);
+    if (arg !== undefined) {
+      throw new Error(`disbord: 不明な引数 "${arg}"`);
+    }
   }
 
   return { action, envTarget };

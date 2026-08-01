@@ -3,7 +3,12 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateDeployWorkflow, resolveOnceTimerEntries, runGenerateWorkflowSsh } from '../src/cli/generateWorkflow';
+import {
+  generateDeployWorkflow,
+  hasSshDeployWorkflow,
+  resolveOnceTimerEntries,
+  runGenerateWorkflowSsh,
+} from '../src/cli/generateWorkflow';
 import { generateLefthookConfig } from '../src/cli/scaffold';
 
 const BASE_CONFIG = `import type { Config } from 'disbord';
@@ -112,6 +117,24 @@ describe('generateDeployWorkflow', () => {
     expect(migrateIndex).toBeLessThan(sshIndex);
   });
 
+  test('Build(Migrate)の後・SSHセットアップの前にスラッシュコマンド登録ステップを挟む', () => {
+    const content = generateDeployWorkflow('my-bot', [], false);
+    expect(content).toContain('- name: Register slash commands');
+    expect(content).toContain('run: bun run commands --production');
+    const buildIndex = content.indexOf('- name: Build');
+    const commandsIndex = content.indexOf('- name: Register slash commands');
+    const sshIndex = content.indexOf('- name: Setup SSH agent');
+    expect(buildIndex).toBeLessThan(commandsIndex);
+    expect(commandsIndex).toBeLessThan(sshIndex);
+  });
+
+  test('dbEnabled: trueの場合、スラッシュコマンド登録ステップはMigrateの後になる', () => {
+    const content = generateDeployWorkflow('my-bot', [], true);
+    const migrateIndex = content.indexOf('- name: Migrate');
+    const commandsIndex = content.indexOf('- name: Register slash commands');
+    expect(migrateIndex).toBeLessThan(commandsIndex);
+  });
+
   test('systemdサービスの有無でrestart/新規作成+startを分岐する', () => {
     const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('if [ -f ~/.config/systemd/user/my-bot.service ]; then');
@@ -206,7 +229,7 @@ describe('runGenerateWorkflowSsh', () => {
       const lefthook = await readFile(join(dir, 'lefthook.yml'), 'utf-8');
       expect(lefthook).toContain(
         '    encrypt:\n      run: mise exec -- bun run encrypt -- --all\n      stage_fixed: true\n' +
-          '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml\n',
+          '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n',
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -274,16 +297,91 @@ describe('runGenerateWorkflowSsh', () => {
     }
   });
 
-  test('onceスクリプトがあるのにtimer設定が無い場合はエラーにせず、その分だけdeploy.yamlから除外する', async () => {
+  test('onceスクリプトがあるのにtimer設定が無い場合、disbord.config.tsへデフォルトcronのtimerを補完してdeploy.yamlに含める', async () => {
     const dir = await setupDir();
     try {
       await mkdir(join(dir, 'src/once'), { recursive: true });
       await writeFile(join(dir, 'src/once/notice.ts'), '');
 
       await runGenerateWorkflowSsh(dir);
+
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`timer: {\n    notice: '*-*-* *:00:00',\n  },`);
+
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).toContain('- name: Deploy once timers');
+      expect(content).toContain('my-bot-notice.service');
+      expect(content).toContain('OnCalendar=*-*-* *:00:00');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('既にtimer設定がある場合は上書きせず既存のcronを使う', async () => {
+    const dir = await setupDir();
+    try {
+      await mkdir(join(dir, 'src/once'), { recursive: true });
+      await writeFile(join(dir, 'src/once/notice.ts'), '');
+      await writeFile(
+        join(dir, 'disbord.config.ts'),
+        BASE_CONFIG.replace('botErrorMessage:', `timer: { notice: '0 9 * * *' },\n  botErrorMessage:`),
+      );
+
+      await runGenerateWorkflowSsh(dir);
+
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`timer: { notice: '0 9 * * *' }`);
+
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).toContain('OnCalendar=0 9 * * *');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('timerがfalsy(手動実行専用の明示的opt-out)な場合は補完せずdeploy.yamlから除外する', async () => {
+    const dir = await setupDir();
+    try {
+      await mkdir(join(dir, 'src/once'), { recursive: true });
+      await writeFile(join(dir, 'src/once/notice.ts'), '');
+      await writeFile(
+        join(dir, 'disbord.config.ts'),
+        BASE_CONFIG.replace('botErrorMessage:', `timer: { notice: '' },\n  botErrorMessage:`),
+      );
+
+      await runGenerateWorkflowSsh(dir);
+
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`timer: { notice: '' }`);
+
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).not.toContain('- name: Deploy once timers');
       expect(content).not.toContain('my-bot-notice');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('複数のonceスクリプトのうち一部だけtimer未設定の場合、その分だけデフォルト値を補完する', async () => {
+    const dir = await setupDir();
+    try {
+      await mkdir(join(dir, 'src/once'), { recursive: true });
+      await writeFile(join(dir, 'src/once/notice.ts'), '');
+      await writeFile(join(dir, 'src/once/cleanup.ts'), '');
+      await writeFile(
+        join(dir, 'disbord.config.ts'),
+        BASE_CONFIG.replace('botErrorMessage:', `timer: {\n    notice: '0 9 * * *',\n  },\n  botErrorMessage:`),
+      );
+
+      await runGenerateWorkflowSsh(dir);
+
+      const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
+      expect(config).toContain(`notice: '0 9 * * *'`);
+      expect(config).toContain(`cleanup: '*-*-* *:00:00'`);
+
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).toContain('my-bot-notice');
+      expect(content).toContain('my-bot-cleanup');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -295,6 +393,39 @@ describe('runGenerateWorkflowSsh', () => {
       await writeFile(join(dir, 'package.json'), JSON.stringify({}, null, 2) + '\n');
       await writeFile(join(dir, 'disbord.config.ts'), BASE_CONFIG);
       await expect(runGenerateWorkflowSsh(dir)).rejects.toThrow(/nameが見つかりませんでした/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('hasSshDeployWorkflow', () => {
+  test('.github/workflows/deploy.yamlが存在しない場合はfalse', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-ssh-workflow-'));
+    try {
+      expect(hasSshDeployWorkflow(dir)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('deploy.yamlがSSH_HOSTを参照するSSHデプロイ用の場合はtrue', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-ssh-workflow-'));
+    try {
+      await mkdir(join(dir, '.github/workflows'), { recursive: true });
+      await writeFile(join(dir, '.github/workflows/deploy.yaml'), generateDeployWorkflow('my-bot', [], false));
+      expect(hasSshDeployWorkflow(dir)).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('deploy.yamlはあるがSSH_HOSTを参照しない場合はfalse', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-ssh-workflow-'));
+    try {
+      await mkdir(join(dir, '.github/workflows'), { recursive: true });
+      await writeFile(join(dir, '.github/workflows/deploy.yaml'), 'name: Deploy\n');
+      expect(hasSshDeployWorkflow(dir)).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

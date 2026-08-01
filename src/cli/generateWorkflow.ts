@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { addTimerEntry } from './configPatch';
 import { scanOnceFiles } from './generateOnceMain';
 import { addWorkflowLefthookCommand } from './lefthookPatch';
 import { readBotConfig } from './readBotConfig';
@@ -82,6 +83,18 @@ WantedBy=timers.target`;
 const SSH_TARGET = '"${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"';
 
 /**
+ * `disbord generate once`が`disbord.config.ts`のtimerへデフォルト値を登録してよいかの判定に使う。
+ * `.github/workflows/deploy.yaml`が無い、またはSSH+systemdデプロイ用（`SSH_HOST`参照）でない場合、
+ * timerを足しても宛先のsystemd timerユニットへ反映されないため登録しない
+ * （代わりに`disbord generate workflow ssh`実行時にsrc/once配下の実ファイルから逆算して補完する）。
+ */
+export function hasSshDeployWorkflow(cwd: string): boolean {
+  const deployYamlPath = join(cwd, '.github/workflows/deploy.yaml');
+  if (!existsSync(deployYamlPath)) return false;
+  return readFileSync(deployYamlPath, 'utf-8').includes('SSH_HOST');
+}
+
+/**
  * メインサービスのデプロイスクリプト。`~/.config/systemd/user/{name}.service`の有無で
  * restart(既存デプロイ)か新規作成+startかを分岐する。
  */
@@ -151,6 +164,8 @@ export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEn
         run: bun run migrate --production`,
         ]
       : []),
+    `      - name: Register slash commands
+        run: bun run commands --production`,
     `      - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -192,7 +207,24 @@ export async function runGenerateWorkflowSsh(cwd: string): Promise<void> {
   }
 
   const onceNames = scanOnceFiles(join(cwd, 'src/once'));
-  const config = await readBotConfig(cwd);
+  let config = await readBotConfig(cwd);
+
+  // `disbord generate once`はtimerをデフォルトで登録しなくなったため、ここで
+  // src/once配下の実ファイルから逆算し、timerキーが無いものにだけデフォルト値を補完する
+  // (キー自体はあるが値がfalsy＝手動実行専用として明示的に外したものは対象外にする。
+  // addTimerEntryが同名キーの二重登録をthrowするため、値の有無ではなくキーの有無で判定する)。
+  const configPath = join(cwd, 'disbord.config.ts');
+  const timerKeys = new Set(Object.keys(config.timer ?? {}));
+  const missingTimerNames = onceNames.filter((name) => !timerKeys.has(name));
+  if (missingTimerNames.length > 0) {
+    let configSource = readFileSync(configPath, 'utf-8');
+    for (const name of missingTimerNames) {
+      configSource = addTimerEntry(configSource, name);
+    }
+    writeFileSync(configPath, configSource);
+    config = await readBotConfig(cwd);
+  }
+
   const onceEntries = resolveOnceTimerEntries(cwd, onceNames, config.timer);
 
   mkdirSync(join(cwd, '.github/workflows'), { recursive: true });
