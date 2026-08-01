@@ -143,6 +143,13 @@ describe('generateDeployWorkflow', () => {
     expect(content).toContain('systemctl --user start my-bot');
   });
 
+  test('新規作成時はdaemon-reload・startの後にenableでホスト再起動後の自動起動も有効化する', () => {
+    const content = generateDeployWorkflow('my-bot', [], false);
+    expect(content).toContain(
+      'systemctl --user daemon-reload\n            systemctl --user start my-bot\n            systemctl --user enable my-bot\n',
+    );
+  });
+
   test('メインサービスユニットの中身(WorkingDirectory/ExecStart等)', () => {
     const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('Description=my-bot discord bot');

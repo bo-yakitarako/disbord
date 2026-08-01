@@ -96,7 +96,9 @@ export function hasSshDeployWorkflow(cwd: string): boolean {
 
 /**
  * メインサービスのデプロイスクリプト。`~/.config/systemd/user/{name}.service`の有無で
- * restart(既存デプロイ)か新規作成+startかを分岐する。
+ * restart(既存デプロイ)か新規作成+startかを分岐する。新規作成時は`start`でその場で起動した後、
+ * `enable`でホスト再起動後も自動起動するようにする(起動有無と自動起動有効化は別概念のため、
+ * onceスクリプトの`enable --now`のような一括指定はできず2行に分けている)。
  */
 function buildMainServiceScript(botName: string): string {
   return `ssh ${SSH_TARGET} bash -s <<'EOF'
@@ -110,6 +112,7 @@ ${buildMainServiceUnit(botName)}
 UNIT
   systemctl --user daemon-reload
   systemctl --user start ${botName}
+  systemctl --user enable ${botName}
 fi
 EOF`;
 }

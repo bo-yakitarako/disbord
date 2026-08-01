@@ -29,12 +29,35 @@ function normalizeDayjsValues<T extends Record<string, unknown>>(data: T): T {
   return normalized as T;
 }
 
+type Fn = (...args: any[]) => any;
+
 /**
- * サブクラス自身の宣言（`@Column`/`@Relate`のaccessor）だけをModel本体のメンバから除いて
- * 取り出す。namespace Xxx { export type Data = ... } のような生成・書き戻しは一切不要で、
- * クラス定義から直接（構造的に）導出できる。
+ * TはPickerでフィルタする対象。`accessor`（get/set両方持つ）だけを残し、getterのみ
+ * （setterなし＝readonly）のプロパティを除外するためのトリック。readonly修飾を外しても
+ * 型が変わらない（＝distributiveに比較して一致する）キーだけがwritableとみなせる。
  */
-type ModelData<C extends Model> = UnwrapDayjs<Omit<C, keyof Model>>;
+type WritableKeys<T> = {
+  [K in keyof T]-?: (<F>() => F extends { [P in K]: T[P] } ? 1 : 2) extends <F>() => F extends {
+    -readonly [P in K]: T[P];
+  }
+    ? 1
+    : 2
+    ? K
+    : never;
+}[keyof T];
+
+/** メソッド（関数型のプロパティ）を除外するためのキー抽出。 */
+type NonFunctionKeys<T> = { [K in keyof T]-?: T[K] extends Fn ? never : K }[keyof T];
+
+/**
+ * サブクラス自身の宣言のうち`@Column`/`@Relate`のaccessorだけをModel本体のメンバから除いて
+ * 取り出す。namespace Xxx { export type Data = ... } のような生成・書き戻しは不要で、
+ * クラス定義から直接（構造的に）導出できる。ただしgetterのみのプロパティは読み取り専用に、
+ * メソッドは関数型になる性質を利用し、WritableKeys/NonFunctionKeysで両方を弾く。
+ */
+type ColumnKeys<C> = Extract<WritableKeys<C>, NonFunctionKeys<C>>;
+
+type ModelData<C extends Model> = UnwrapDayjs<Pick<Omit<C, keyof Model>, ColumnKeys<Omit<C, keyof Model>>>>;
 
 type ModelClass<C extends Model> = {
   new (data: BaseProps & Record<string, unknown>): C;
