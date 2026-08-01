@@ -5,7 +5,7 @@ import type { EnvKeyType } from './envTypes';
  * 生成するbotが依存する`disbord`のバージョン範囲。
  * disbordを新しいバージョンで公開したら、このバージョン範囲も手動で追従させる。
  */
-const DISBORD_VERSION_RANGE = '^2.2.5';
+const DISBORD_VERSION_RANGE = '^2.2.6';
 
 /**
  * 生成するbotが使うbunのバージョン(mise.toml/`@types/bun`両方で使う)。
