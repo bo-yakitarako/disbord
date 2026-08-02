@@ -54,6 +54,24 @@ namespace Job {
   };
 }
 
+@Table('reminders')
+class Reminder extends Model<Reminder.Data> {
+  @Column('text', { default: 'pending' })
+  accessor status!: string;
+
+  @Column('text')
+  accessor title!: string;
+
+  @Column('integer', { mode: 'boolean', default: true })
+  accessor archived!: boolean;
+
+  @Column('integer', { mode: 'timestamp_ms', default: 'now' })
+  accessor firedAt!: Dayjs;
+}
+namespace Reminder {
+  export type Data = { status?: string; title: string; archived?: boolean; firedAt?: Date | Dayjs };
+}
+
 describe('buildDataTypeLiteral', () => {
   test('columns/relatesが空なら空オブジェクト型', () => {
     expect(buildDataTypeLiteral({ columns: [], relates: [] })).toBe('{  }');
@@ -68,6 +86,13 @@ describe('buildDataTypeLiteral', () => {
     const meta = readModelMeta(Job as unknown as ModelClass);
     expect(buildDataTypeLiteral(meta)).toBe(
       '{ status: string; archived: boolean; actedAt: Date | Dayjs; priority: number; score: number; userId: string }',
+    );
+  });
+
+  test('@Columnにdefaultが指定されているカラムは?付きのoptionalにする(create()呼び出し時に省略できるようにするため)', () => {
+    const meta = readModelMeta(Reminder as unknown as ModelClass);
+    expect(buildDataTypeLiteral(meta)).toBe(
+      '{ status?: string; title: string; archived?: boolean; firedAt?: Date | Dayjs }',
     );
   });
 });

@@ -32,16 +32,25 @@ function columnTsType(column: ColumnMeta): string {
 }
 
 /**
+ * `@Column`に`default`が指定されているカラムは、`Job.create()`呼び出し時に省略できるよう
+ * `Data`型でも`?`付きのoptionalにする（DB側/JS側どちらのdefaultでも、値を渡さなければ
+ * drizzle・DB側のdefault機構がそのまま効くため、型を必須にしておく理由が無い）。
+ * `namespace`の`Data`型はサブクラスのaccessor宣言から独立した別物のため、
+ * 「TypeScriptの`accessor`自体は`?`を付けたoptionalにできない」という制約を受けない。
+ */
+function columnField(column: ColumnMeta): string {
+  const optional = column.options.default !== undefined ? '?' : '';
+  return `${column.property}${optional}: ${columnTsType(column)}`;
+}
+
+/**
  * `Model<Xxx.Data>`に渡すData型（コンストラクタに渡す生データの型）を、
  * @Column/@Relateのメタデータから機械的に組み立てる。
  * timestamp_msカラムはgetter越しにDayjsでラップされるが、Data自体はDB/コンストラクタに
  * 渡す生の`Date`のまま（`Model`本体のcreatedAt/updatedAtと同じ扱い）。
  */
 export function buildDataTypeLiteral(meta: Pick<ModelMeta, 'columns' | 'relates'>): string {
-  const fields = [
-    ...meta.columns.map((column) => `${column.property}: ${columnTsType(column)}`),
-    ...meta.relates.map((relate) => `${relate.property}: string`),
-  ];
+  const fields = [...meta.columns.map(columnField), ...meta.relates.map((relate) => `${relate.property}: string`)];
   return `{ ${fields.join('; ')} }`;
 }
 

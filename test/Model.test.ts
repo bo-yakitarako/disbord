@@ -32,13 +32,25 @@ namespace Job {
   export type Data = { sample: string; scheduledAt: Date | Dayjs };
 }
 
+@Table('reminders')
+class Reminder extends Model<Reminder.Data> {
+  @Column('text', { default: 'pending' })
+  accessor status!: string;
+
+  @Column('text')
+  accessor title!: string;
+}
+namespace Reminder {
+  export type Data = { status?: string; title: string };
+}
+
 let dir: string;
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'disbord-model-'));
   const dbUrl = `file:${join(dir, 'test.db')}`;
 
-  const schema = buildSchema([Job as unknown as ModelClass]);
+  const schema = buildSchema([Job, Reminder] as unknown as ModelClass[]);
   const cur = await generateSQLiteDrizzleJson(schema);
   const prev = await generateSQLiteDrizzleJson({});
   const statements = await generateSQLiteMigration(prev, cur);
@@ -111,5 +123,13 @@ describe('モデル自身のメソッド内からのthis.update()呼び出し', 
 
     const refetched = await Job.find({ id: job.id });
     expect(refetched?.sample).toBe('y');
+  });
+});
+
+describe('@Columnにdefaultが指定されたカラムの省略', () => {
+  test('create()呼び出し時にキャスト無しで省略でき、DB側のdefault値が入る', async () => {
+    const reminder = await Reminder.create({ title: 'foo' });
+    expect(reminder.status).toBe('pending');
+    expect(reminder.title).toBe('foo');
   });
 });
