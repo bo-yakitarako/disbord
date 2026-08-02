@@ -126,6 +126,28 @@ describe('モデル自身のメソッド内からのthis.update()呼び出し', 
   });
 });
 
+describe('Model.exists()', () => {
+  test('条件に一致するレコードが存在すればtrueを返す', async () => {
+    const job = await Job.create({ sample: 'x', scheduledAt: dayjs('2026-02-01T00:00:00.000Z') } as never);
+
+    expect(await Job.exists({ id: job.id })).toBe(true);
+    expect(await Job.exists({ sample: 'x' })).toBe(true);
+  });
+
+  test('条件に一致するレコードが存在しなければfalseを返す', async () => {
+    await Job.create({ sample: 'x', scheduledAt: dayjs('2026-02-01T00:00:00.000Z') } as never);
+
+    expect(await Job.exists({ sample: 'unknown' })).toBe(false);
+  });
+
+  test('条件を指定しなければテーブルに1件でもレコードがあればtrueを返す', async () => {
+    expect(await Reminder.exists()).toBe(false);
+
+    await Reminder.create({ title: 'foo' });
+    expect(await Reminder.exists()).toBe(true);
+  });
+});
+
 describe('@Columnにdefaultが指定されたカラムの省略', () => {
   test('create()呼び出し時にキャスト無しで省略でき、DB側のdefault値が入る', async () => {
     const reminder = await Reminder.create({ title: 'foo' });

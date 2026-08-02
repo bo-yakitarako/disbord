@@ -1,5 +1,5 @@
 import dayjs, { type Dayjs } from 'dayjs';
-import { and, eq, getTableColumns } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { dataGetter, getColumnBag, mergeColumnBag, setColumnBag } from './decorators';
 import { getDbState } from './state';
 
@@ -129,6 +129,17 @@ export abstract class Model<Data extends Record<string, unknown> = Record<string
       return null;
     }
     return new this(data as never);
+  }
+
+  public static async exists<C extends Model<any>>(
+    this: ModelClass<C>,
+    query: Partial<BaseProps & ModelData<C>> = {},
+  ): Promise<boolean> {
+    const where = buildWhereClause(this.table, normalizeDayjsValues(query as Record<string, unknown>));
+    const result = await getDbState().db.get<{ found: number }>(
+      sql`select exists(select 1 from ${this.table} ${where ? sql`where ${where}` : sql``}) as found`,
+    );
+    return result?.found === 1;
   }
 
   public static async findMany<C extends Model<any>>(
