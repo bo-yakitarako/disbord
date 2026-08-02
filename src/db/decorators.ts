@@ -80,14 +80,34 @@ function push<T>(metadata: MetadataBag, key: symbol, entry: T): void {
   list.push(entry);
 }
 
-function dataGetter(
+/**
+ * Modelインスタンスごとのカラム値を保持する内部ストレージ。`@Column`/`@Relate`の
+ * accessorもModel本体のid/createdAt/updatedAtも、インスタンスのプロパティとしては
+ * 持たずここに集約する（save()/set()がDB行全体をまとめて読み書きする都合上、
+ * フィールドごとに独立したストレージへ分散させるよりフラットな1オブジェクトの方が扱いやすい）。
+ */
+const columnStore = new WeakMap<object, Record<string, unknown>>();
+
+export function getColumnBag(instance: object): Record<string, unknown> {
+  return columnStore.get(instance) ?? {};
+}
+
+export function setColumnBag(instance: object, data: Record<string, unknown>): void {
+  columnStore.set(instance, data);
+}
+
+export function mergeColumnBag(instance: object, data: Record<string, unknown>): void {
+  columnStore.set(instance, { ...getColumnBag(instance), ...data });
+}
+
+export function dataGetter(
   property: string,
   options: { dayjs?: boolean } = {},
 ): { get(this: any): any; set(this: any): void } {
   return {
     get(this: any) {
-      const value = this._data[property];
-      return options.dayjs && value != null ? dayjs(value) : value;
+      const value = getColumnBag(this)[property];
+      return options.dayjs && value != null ? dayjs(value as any) : value;
     },
     set(this: any) {
       throw new Error(

@@ -12,6 +12,7 @@ import { runGenerateOnce } from './generateOnce';
 import { runGenerateWorkflowSsh } from './generateWorkflow';
 import { buildHelpText } from './help';
 import { parseMigrateArgs, runMigrate } from './migrate';
+import { runModelType } from './modelType';
 import { parseOnceArgs, runOnce } from './once';
 import { readBotConfig } from './readBotConfig';
 import { runStudio } from './studio';
@@ -41,6 +42,7 @@ const IMPLEMENTED_COMMANDS = [
   'generate workflow ssh',
   'once',
   'migrate',
+  'model type',
   'studio',
   'enable',
   'disable',
@@ -125,6 +127,14 @@ async function dispatch(): Promise<number> {
     return runMigrate(production, process.cwd());
   }
 
+  if (command === 'model') {
+    if (sub === 'type') {
+      await runModelType(process.cwd());
+      return 0;
+    }
+    throw new Error('disbord: 使い方: disbord model type');
+  }
+
   if (command === 'studio') {
     return runStudio(process.cwd());
   }
@@ -156,6 +166,7 @@ async function dispatch(): Promise<number> {
     'generate workflow ssh',
     'once',
     'migrate',
+    'model type',
     'studio',
     'enable',
     'disable',

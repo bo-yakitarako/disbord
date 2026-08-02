@@ -1,23 +1,18 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import { and, eq, getTableColumns } from 'drizzle-orm';
+import { dataGetter, getColumnBag, mergeColumnBag, setColumnBag } from './decorators';
 import { getDbState } from './state';
 
 export type BaseProps = { id: string; createdAt: Date; updatedAt: Date };
 
 /**
- * `@Column({ mode: 'timestamp_ms' })`のaccessorはgetter越しにDayjsでラップされるため、
- * `accessor actedAt!: Dayjs;`のように「読み取り時の型」をそのまま宣言する。だがDB書き込み・
- * create()の入力はdrizzleが`.getTime()`を呼べる生の`Date`が必要（Dayjsインスタンスのまま渡すと
- * `value.getTime is not a function`で壊れる。実機確認済み）。
- * 一方で「既存モデルから読み取ったDayjs値をそのままcreate()/update()に渡し回す」のは
- * 自然な使い方のため、型上はDate/Dayjsの両方を受け付け、実行時にnormalizeDayjsValuesで
- * Dayjs→Dateへ変換してからdrizzleに渡す。
- */
-type UnwrapDayjs<T> = { [K in keyof T]: T[K] extends Dayjs ? Date | Dayjs : T[K] };
-
-/**
- * data中のDayjsインスタンスを生のDateへ変換する。@Column(timestamp_ms)のプロパティ名を
- * メタデータから引く必要はなく、値がdayjs.isDayjs()かどうかだけで判定できる。
+ * data中のDayjsインスタンスを生のDateへ変換する。`@Column(timestamp_ms)`のaccessorは
+ * getter越しにDayjsでラップして返すため、「既存モデルから読み取ったDayjs値をそのまま
+ * create()/update()に渡し回す」のが自然な使い方になる。だがDB書き込みはdrizzleが
+ * `.getTime()`を呼べる生の`Date`を要求する（Dayjsインスタンスのまま渡すと
+ * `value.getTime is not a function`で壊れる。実機確認済み）ため、渡す直前にここで変換する。
+ * @Column(timestamp_ms)のプロパティ名をメタデータから引く必要はなく、値が
+ * dayjs.isDayjs()かどうかだけで判定できる。
  */
 function normalizeDayjsValues<T extends Record<string, unknown>>(data: T): T {
   const normalized: Record<string, unknown> = { ...data };
@@ -29,37 +24,20 @@ function normalizeDayjsValues<T extends Record<string, unknown>>(data: T): T {
   return normalized as T;
 }
 
-type Fn = (...args: any[]) => any;
-
 /**
- * TはPickerでフィルタする対象。`accessor`（get/set両方持つ）だけを残し、getterのみ
- * （setterなし＝readonly）のプロパティを除外するためのトリック。readonly修飾を外しても
- * 型が変わらない（＝distributiveに比較して一致する）キーだけがwritableとみなせる。
+ * `class Job extends Model<Job.Data>`のように、サブクラス自身が`Data`を型引数として
+ * 渡す。`Data`はクラス自身の型引数として`extends`時点で確定するため、`this`の多相性に
+ * 依存せずに済む（`Partial<Omit<this, keyof Model>>`のような`this`越しのマップ/条件型は、
+ * クラス自身のメソッド内から`this.update(...)`のように呼ぶとTypeScriptが解決できない
+ * 既知の制限があり、実機で確認済み。`Data`をただの型引数にすることでこの制限を回避する）。
+ * `namespace Job { export type Data = ... }`は`disbord generate model`/`disbord migrate`/
+ * `disbord model type`が`@Column`/`@Relate`のメタデータから自動生成する（手書き不要）。
+ * timestamp_msカラムは`Data`側で最初から`Date | Dayjs`として生成されるため、
+ * `ModelData`自身がDayjsを特別扱いする必要はない（modelDataBlock.ts参照）。
  */
-type WritableKeys<T> = {
-  [K in keyof T]-?: (<F>() => F extends { [P in K]: T[P] } ? 1 : 2) extends <F>() => F extends {
-    -readonly [P in K]: T[P];
-  }
-    ? 1
-    : 2
-    ? K
-    : never;
-}[keyof T];
+type ModelData<C extends Model<any>> = C extends Model<infer T> ? T : never;
 
-/** メソッド（関数型のプロパティ）を除外するためのキー抽出。 */
-type NonFunctionKeys<T> = { [K in keyof T]-?: T[K] extends Fn ? never : K }[keyof T];
-
-/**
- * サブクラス自身の宣言のうち`@Column`/`@Relate`のaccessorだけをModel本体のメンバから除いて
- * 取り出す。namespace Xxx { export type Data = ... } のような生成・書き戻しは不要で、
- * クラス定義から直接（構造的に）導出できる。ただしgetterのみのプロパティは読み取り専用に、
- * メソッドは関数型になる性質を利用し、WritableKeys/NonFunctionKeysで両方を弾く。
- */
-type ColumnKeys<C> = Extract<WritableKeys<C>, NonFunctionKeys<C>>;
-
-type ModelData<C extends Model> = UnwrapDayjs<Pick<Omit<C, keyof Model>, ColumnKeys<Omit<C, keyof Model>>>>;
-
-type ModelClass<C extends Model> = {
+type ModelClass<C extends Model<any>> = {
   new (data: BaseProps & Record<string, unknown>): C;
   tableName: string;
   table: Record<string, unknown>;
@@ -72,6 +50,18 @@ type QueryClient = Record<
     findMany: (config?: unknown) => Promise<unknown[]>;
   }
 >;
+
+/**
+ * `id`/`createdAt`/`updatedAt`は`@Column`のようなメタデータ登録は不要
+ * （buildSchema.tsで専用のカラムとして組み立てるため）だが、サブクラスの
+ * `@Column`付きaccessorと同じくインスタンスのカラム値ストレージ越しの読み取りに
+ * したいので、dataGetterだけを流用してaccessorのget/setを差し替える。
+ */
+function baseColumn(property: keyof BaseProps, options: { dayjs?: boolean } = {}) {
+  return function (_target: unknown, _context: ClassAccessorDecoratorContext) {
+    return dataGetter(property, options);
+  };
+}
 
 function isNullish(value: unknown) {
   return value === undefined || value === null;
@@ -92,24 +82,20 @@ function buildWhereClause(table: Record<string, unknown>, query: Record<string, 
   return and(...conditions);
 }
 
-export abstract class Model {
+export abstract class Model<Data extends Record<string, unknown> = Record<string, unknown>> {
   protected static _tableName: string;
-  protected _data: BaseProps & Record<string, unknown>;
+
+  @baseColumn('id')
+  accessor id!: string;
+
+  @baseColumn('createdAt', { dayjs: true })
+  accessor createdAt!: Dayjs;
+
+  @baseColumn('updatedAt', { dayjs: true })
+  accessor updatedAt!: Dayjs;
 
   constructor(data: BaseProps & Record<string, unknown>) {
-    this._data = data;
-  }
-
-  public get id() {
-    return this._data.id;
-  }
-
-  public get createdAt() {
-    return dayjs(this._data.createdAt);
-  }
-
-  public get updatedAt() {
-    return dayjs(this._data.updatedAt);
+    setColumnBag(this, data);
   }
 
   public static get tableName(): string {
@@ -120,7 +106,7 @@ export abstract class Model {
     return getDbState().schema[this.tableName] as Record<string, unknown>;
   }
 
-  public static async create<C extends Model>(this: ModelClass<C>, data: ModelData<C>): Promise<C> {
+  public static async create<C extends Model<any>>(this: ModelClass<C>, data: ModelData<C>): Promise<C> {
     const now = new Date();
     const [inserted] = (await getDbState()
       .db.insert(this.table as never)
@@ -133,7 +119,7 @@ export abstract class Model {
     return new this(inserted as never);
   }
 
-  public static async find<C extends Model>(
+  public static async find<C extends Model<any>>(
     this: ModelClass<C>,
     query: Partial<BaseProps & ModelData<C>> = {},
   ): Promise<C | null> {
@@ -145,7 +131,7 @@ export abstract class Model {
     return new this(data as never);
   }
 
-  public static async findMany<C extends Model>(
+  public static async findMany<C extends Model<any>>(
     this: ModelClass<C>,
     query: Partial<BaseProps & ModelData<C>> = {},
   ): Promise<C[]> {
@@ -154,7 +140,7 @@ export abstract class Model {
     return rows.map((row) => new this(row as never));
   }
 
-  public static async updateAll<C extends Model>(
+  public static async updateAll<C extends Model<any>>(
     this: ModelClass<C>,
     condition: Partial<BaseProps & ModelData<C>>,
     data: Partial<ModelData<C>>,
@@ -170,13 +156,13 @@ export abstract class Model {
       .where(where);
   }
 
-  public set(data: Partial<ModelData<this>>) {
-    this._data = { ...this._data, ...normalizeDayjsValues(data as Record<string, unknown>) };
+  public set(data: Partial<Data>) {
+    mergeColumnBag(this, normalizeDayjsValues(data as Record<string, unknown>));
   }
 
   public async save() {
-    this._data.updatedAt = new Date();
-    const { id, ...rest } = this._data;
+    mergeColumnBag(this, { updatedAt: new Date() });
+    const { id, ...rest } = getColumnBag(this);
     const table = (this.constructor as typeof Model).table;
     const columns = getTableColumns(table as never) as Record<string, unknown>;
 
@@ -186,7 +172,7 @@ export abstract class Model {
       .where(eq(columns.id as never, id));
   }
 
-  public async update(data: Partial<ModelData<this>>) {
+  public async update(data: Partial<Data>) {
     this.set(data);
     await this.save();
   }

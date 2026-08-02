@@ -6,6 +6,7 @@ import type { Config } from '../config';
 import { buildSchema } from '../db/buildSchema';
 import { applyPendingMigrations, STATEMENT_BREAKPOINT } from '../db/migrationRunner';
 import { describeUnsafeAddColumnError, findUnsafeAddColumnStatements } from './migrationSafety';
+import { rewriteModelDataBlocks } from './modelDataBlock';
 import { readBotConfig } from './readBotConfig';
 import { scanModelFiles } from './scanModelFiles';
 import { writeSchemaFile } from './schemaGen';
@@ -24,6 +25,7 @@ export async function runDevMigrate(cwd: string): Promise<void> {
   const snapshotPath = join(migrationsDir, '_snapshot.json');
 
   const models = await scanModelFiles(modelsDir);
+  await rewriteModelDataBlocks(cwd, modelsDir, models);
   writeSchemaFile(cwd, models);
 
   const schema = buildSchema(models.map((m) => m.modelClass));

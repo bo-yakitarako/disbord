@@ -11,12 +11,25 @@ import { Column, Table, type ModelClass } from '../src/db/decorators';
 import { Model } from '../src/db/Model';
 
 @Table('jobs')
-class Job extends Model {
+class Job extends Model<Job.Data> {
   @Column('text')
   accessor sample!: string;
 
   @Column('integer', { mode: 'timestamp_ms' })
   accessor scheduledAt!: Dayjs;
+
+  /**
+   * `Data`をクラス自身の型引数として渡す設計（`this`の多相性に依存しない）が効いているかの
+   * 実地検証。`this.update(...)`をモデル自身のメソッド内から`this`経由で呼ぶパターンは、
+   * `Partial<Omit<this, keyof Model>>`のような`this`越しのマップ/条件型では解決できない
+   * （TypeScriptの既知の制限。実機確認済み）。
+   */
+  async touch(sample: string) {
+    await this.update({ sample });
+  }
+}
+namespace Job {
+  export type Data = { sample: string; scheduledAt: Date | Dayjs };
 }
 
 let dir: string;
@@ -87,5 +100,16 @@ describe('ModelのDayjs正規化', () => {
 
     const updated = await Job.find({ sample: 'x' });
     expect(updated?.scheduledAt.toISOString()).toBe('2026-04-01T00:00:00.000Z');
+  });
+});
+
+describe('モデル自身のメソッド内からのthis.update()呼び出し', () => {
+  test('this.update(...)をキャスト無しで呼び出せ、実際に更新される', async () => {
+    const job = await Job.create({ sample: 'x', scheduledAt: dayjs() });
+    await job.touch('y');
+    expect(job.sample).toBe('y');
+
+    const refetched = await Job.find({ id: job.id });
+    expect(refetched?.sample).toBe('y');
   });
 });

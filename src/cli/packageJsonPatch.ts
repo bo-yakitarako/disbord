@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DB_DEPENDENCIES, DB_GEN_MODEL_SCRIPT, DB_MIGRATE_SCRIPT, DB_STUDIO_SCRIPT } from './scaffold';
+import {
+  DB_DEPENDENCIES,
+  DB_GEN_MODEL_SCRIPT,
+  DB_MIGRATE_SCRIPT,
+  DB_MODEL_TYPE_SCRIPT,
+  DB_STUDIO_SCRIPT,
+} from './scaffold';
 
 export type PackageJsonLike = {
   scripts?: Record<string, string>;
@@ -17,10 +23,11 @@ export function writePackageJson(cwd: string, pkg: PackageJsonLike): void {
 }
 
 /**
- * gen:model/migrate/studioスクリプトはhelpの直前(生成テンプレの並び順)に、この順で挿入する。
- * いずれもdb.enable前提のコマンド(`disbord generate model`/`disbord migrate`/`disbord studio`自体も
- * db.enableが無効ならエラーで落とす。generateModel.ts/migrateRunner.ts/studio.ts参照)のため、
- * scripts自体もdb有効時のみ持つ。
+ * gen:model/migrate/model:type/studioスクリプトはhelpの直前(生成テンプレの並び順)に、この順で
+ * 挿入する。いずれもdb.enable前提のコマンド(`disbord generate model`/`disbord migrate`/
+ * `disbord model type`/`disbord studio`自体もdb.enableが無効ならエラーで落とす。
+ * generateModel.ts/migrateRunner.ts/modelType.ts/studio.ts参照)のため、scripts自体も
+ * db有効時のみ持つ。
  * DB_DEPENDENCIESはdisbord/scaffoldの依存表を参照する(base package.json生成側と実体を共有)。
  */
 export function addDbToPackageJson(pkg: PackageJsonLike): PackageJsonLike {
@@ -28,6 +35,7 @@ export function addDbToPackageJson(pkg: PackageJsonLike): PackageJsonLike {
   const dbScripts = {
     [DB_GEN_MODEL_SCRIPT.name]: DB_GEN_MODEL_SCRIPT.command,
     [DB_MIGRATE_SCRIPT.name]: DB_MIGRATE_SCRIPT.command,
+    [DB_MODEL_TYPE_SCRIPT.name]: DB_MODEL_TYPE_SCRIPT.command,
     [DB_STUDIO_SCRIPT.name]: DB_STUDIO_SCRIPT.command,
   };
   const scripts = help !== undefined ? { ...restScripts, ...dbScripts, help } : { ...restScripts, ...dbScripts };
@@ -43,6 +51,7 @@ export function removeDbFromPackageJson(pkg: PackageJsonLike): PackageJsonLike {
   const scripts = { ...pkg.scripts };
   delete scripts[DB_GEN_MODEL_SCRIPT.name];
   delete scripts[DB_MIGRATE_SCRIPT.name];
+  delete scripts[DB_MODEL_TYPE_SCRIPT.name];
   delete scripts[DB_STUDIO_SCRIPT.name];
 
   const dependencies = { ...pkg.dependencies };

@@ -17,11 +17,20 @@ function basePkg(): PackageJsonLike {
 }
 
 describe('addDbToPackageJson', () => {
-  test('gen:model・migrate・studioスクリプトをこの順でhelpの直前に挿入する', () => {
+  test('gen:model・migrate・model:type・studioスクリプトをこの順でhelpの直前に挿入する', () => {
     const result = addDbToPackageJson(basePkg());
-    expect(Object.keys(result.scripts!)).toEqual(['dev', 'env', 'gen:model', 'migrate', 'studio', 'help']);
+    expect(Object.keys(result.scripts!)).toEqual([
+      'dev',
+      'env',
+      'gen:model',
+      'migrate',
+      'model:type',
+      'studio',
+      'help',
+    ]);
     expect(result.scripts!['gen:model']).toBe('disbord generate model');
     expect(result.scripts!.migrate).toBe('disbord migrate');
+    expect(result.scripts!['model:type']).toBe('disbord model type');
     expect(result.scripts!.studio).toBe('disbord studio');
   });
 

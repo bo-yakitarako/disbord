@@ -45,6 +45,12 @@ const COMMANDS: CommandHelp[] = [
     requiresDb: true,
   },
   {
+    usage: 'disbord model type',
+    description:
+      '各モデルファイル末尾のnamespace Data型ブロックだけを再生成する（schema.ts再生成・migration・DB接続は行わない）',
+    requiresDb: true,
+  },
+  {
     usage: 'disbord studio',
     description: '.disbord/db/dev.dbを対象にdrizzle studioサーバーを起動する',
     requiresDb: true,
