@@ -29,6 +29,7 @@ export type StringSelectMenuInteraction = DiscordStringSelectMenuInteraction & {
 export type ChatInputCommandInteraction = DiscordChatInputCommandInteraction & {
   ephemeral: Ephemeral<DiscordChatInputCommandInteraction>;
 };
+export type RepliableInteraction = ButtonInteraction | StringSelectMenuInteraction | ChatInputCommandInteraction;
 
 export function wrapButtonInteraction(interaction: DiscordButtonInteraction): ButtonInteraction {
   return withEphemeral(interaction);

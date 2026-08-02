@@ -24,6 +24,7 @@ export { makeButtonRow, routeButtonInteraction } from './components/buttons';
 export {
   type ButtonInteraction,
   type ChatInputCommandInteraction,
+  type RepliableInteraction,
   type StringSelectMenuInteraction,
 } from './components/interaction';
 export { makeSelectMenuRow, routeSelectMenuInteraction } from './components/selectMenus';
