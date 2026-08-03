@@ -17,9 +17,15 @@ const WORKFLOW_COMMAND_MARKER = 'gen:workflow ssh';
  * （generateWorkflow.ts参照）。deploy.yamlだけをステージすると、その副作用の書き込みが
  * ステージされないままcommitに含まれず、次回commitまでdisbord.config.tsとdeploy.yamlの
  * 内容が食い違った状態になってしまう。
+ *
+ * `assets`もgit addするのは、deploy.yamlのUpload build artifactsステップがrsyncで
+ * `assets/`をデプロイ先へ送る前提のため（generateWorkflow.ts参照）、CI側のcheckoutに
+ * 含まれるようgitへの追跡漏れを防ぐ意図。`assets/`が無い/空のプロジェクトでも
+ * `git add`がpathspec不一致でコマンド全体を失敗させないよう、シェル側で存在確認してから
+ * 対象に含める(`[ -d assets ] && echo assets`)。
  */
 export function buildWorkflowLefthookBlock(): string {
-  return `    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n`;
+  return `    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts $([ -d assets ] && echo assets)\n`;
 }
 
 /**

@@ -5,7 +5,7 @@ import { generateLefthookConfig } from '../src/cli/scaffold';
 describe('buildWorkflowLefthookBlock', () => {
   test('mise exec -- bun run gen:workflow sshの後にgit addで生成結果を明示的にステージする', () => {
     expect(buildWorkflowLefthookBlock()).toBe(
-      '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n',
+      '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts $([ -d assets ] && echo assets)\n',
     );
   });
 });
@@ -15,7 +15,7 @@ describe('addWorkflowLefthookCommand', () => {
     const result = addWorkflowLefthookCommand(generateLefthookConfig());
     expect(result).toContain(
       '    encrypt:\n      run: mise exec -- bun run encrypt -- --all\n      stage_fixed: true\n' +
-        '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n',
+        '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts $([ -d assets ] && echo assets)\n',
     );
   });
 
@@ -44,7 +44,7 @@ describe('addWorkflowLefthookCommand', () => {
     const result = addWorkflowLefthookCommand(source);
     expect(result).toContain(
       '    encrypt:\n      run: mise exec -- bun run encrypt -- --all\n      stage_fixed: true\n' +
-        '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n' +
+        '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts $([ -d assets ] && echo assets)\n' +
         '    custom:\n      run: echo custom\n',
     );
   });

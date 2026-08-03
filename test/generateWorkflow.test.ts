@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   generateDeployWorkflow,
+  hasAssetsDir,
   hasSshDeployWorkflow,
   resolveOnceTimerEntries,
   runGenerateWorkflowSsh,
@@ -186,6 +187,25 @@ describe('generateDeployWorkflow', () => {
     expect(content).toContain('systemctl --user enable --now my-bot-cleanup.timer');
   });
 
+  test('assetsEnabled: falseならassetsのrsyncを含まない(デフォルトもfalse相当)', () => {
+    const content = generateDeployWorkflow('my-bot', [], false);
+    expect(content).toContain('rsync -avz dist/');
+    expect(content).not.toContain('rsync -avz assets/');
+  });
+
+  test('assetsEnabled: trueならdist/のrsyncに続けてassets/を${DEPLOY_PATH}/assets/へrsyncする', () => {
+    const content = generateDeployWorkflow('my-bot', [], false, true);
+    expect(content).toContain(
+      'rsync -avz dist/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}":"${{ secrets.DEPLOY_PATH }}"',
+    );
+    expect(content).toContain(
+      'rsync -avz assets/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}":"${{ secrets.DEPLOY_PATH }}/assets/"',
+    );
+    const distIndex = content.indexOf('rsync -avz dist/');
+    const assetsIndex = content.indexOf('rsync -avz assets/');
+    expect(distIndex).toBeLessThan(assetsIndex);
+  });
+
   test('有効なYAMLとしてパースでき、ヒアドキュメントの終端行(EOF/UNIT)がYAML側のインデント除去後に行頭へ揃う', () => {
     const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }], false);
 
@@ -236,7 +256,7 @@ describe('runGenerateWorkflowSsh', () => {
       const lefthook = await readFile(join(dir, 'lefthook.yml'), 'utf-8');
       expect(lefthook).toContain(
         '    encrypt:\n      run: mise exec -- bun run encrypt -- --all\n      stage_fixed: true\n' +
-          '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts\n',
+          '    workflow:\n      run: mise exec -- bun run gen:workflow ssh && git add .github/workflows/deploy.yaml disbord.config.ts $([ -d assets ] && echo assets)\n',
       );
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -394,6 +414,45 @@ describe('runGenerateWorkflowSsh', () => {
     }
   });
 
+  test('assets/ディレクトリが存在する場合はassetsのrsyncステップを含める', async () => {
+    const dir = await setupDir();
+    try {
+      await mkdir(join(dir, 'assets'), { recursive: true });
+      await writeFile(join(dir, 'assets/calendar_base.png'), '');
+
+      await runGenerateWorkflowSsh(dir);
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).toContain('rsync -avz assets/');
+      expect(content).toContain('${{ secrets.DEPLOY_PATH }}/assets/');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('assets/ディレクトリが無い場合はassetsのrsyncステップを含めない', async () => {
+    const dir = await setupDir();
+    try {
+      await runGenerateWorkflowSsh(dir);
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).not.toContain('rsync -avz assets/');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('assets/ディレクトリが空の場合はassetsのrsyncステップを含めない', async () => {
+    const dir = await setupDir();
+    try {
+      await mkdir(join(dir, 'assets'), { recursive: true });
+
+      await runGenerateWorkflowSsh(dir);
+      const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
+      expect(content).not.toContain('rsync -avz assets/');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('package.jsonにnameが無い場合はthrow', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'disbord-generate-workflow-'));
     try {
@@ -433,6 +492,38 @@ describe('hasSshDeployWorkflow', () => {
       await mkdir(join(dir, '.github/workflows'), { recursive: true });
       await writeFile(join(dir, '.github/workflows/deploy.yaml'), 'name: Deploy\n');
       expect(hasSshDeployWorkflow(dir)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('hasAssetsDir', () => {
+  test('assets/ディレクトリが存在しない場合はfalse', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-assets-dir-'));
+    try {
+      expect(hasAssetsDir(dir)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('assets/ディレクトリが空の場合はfalse', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-assets-dir-'));
+    try {
+      await mkdir(join(dir, 'assets'), { recursive: true });
+      expect(hasAssetsDir(dir)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('assets/ディレクトリにファイルが1件以上ある場合はtrue', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-has-assets-dir-'));
+    try {
+      await mkdir(join(dir, 'assets'), { recursive: true });
+      await writeFile(join(dir, 'assets/calendar_base.png'), '');
+      expect(hasAssetsDir(dir)).toBe(true);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

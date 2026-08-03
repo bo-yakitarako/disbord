@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { addTimerEntry } from './configPatch';
 import { scanOnceFiles } from './generateOnceMain';
@@ -95,6 +95,16 @@ export function hasSshDeployWorkflow(cwd: string): boolean {
 }
 
 /**
+ * 空の`assets/`をrsync対象に含めても転送するファイルが無く無意味なため、
+ * ディレクトリの存在だけでなく中身が1件以上あるかまで見て判定する。
+ */
+export function hasAssetsDir(cwd: string): boolean {
+  const assetsPath = join(cwd, 'assets');
+  if (!existsSync(assetsPath)) return false;
+  return readdirSync(assetsPath).length > 0;
+}
+
+/**
  * メインサービスのデプロイスクリプト。`~/.config/systemd/user/{name}.service`の有無で
  * restart(既存デプロイ)か新規作成+startかを分岐する。新規作成時は`start`でその場で起動した後、
  * `enable`でホスト再起動後も自動起動するようにする(起動有無と自動起動有効化は別概念のため、
@@ -149,7 +159,25 @@ function buildStep(name: string, runScript: string): string {
 ${indentLines(runScript, CONTENT_INDENT)}`;
 }
 
-export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEntry[], dbEnabled: boolean): string {
+/**
+ * `assets/`はdev時に`process.cwd()`基準の相対パス(`./assets/*`)で参照される想定のため、
+ * デプロイ先でも`WorkingDirectory`（`${DEPLOY_PATH}`）直下の`assets/`に置いて相対パスの
+ * 整合性を保つ(`dist/`と違いdist直下に含めず、プロジェクトルートの`assets/`をそのまま送る)。
+ */
+function buildUploadArtifactsScript(assetsEnabled: boolean): string {
+  const lines = [`rsync -avz dist/ ${SSH_TARGET}:"\${{ secrets.DEPLOY_PATH }}"`];
+  if (assetsEnabled) {
+    lines.push(`rsync -avz assets/ ${SSH_TARGET}:"\${{ secrets.DEPLOY_PATH }}/assets/"`);
+  }
+  return lines.join('\n');
+}
+
+export function generateDeployWorkflow(
+  botName: string,
+  onceEntries: OnceTimerEntry[],
+  dbEnabled: boolean,
+  assetsEnabled = false,
+): string {
   const steps = [
     `      - name: Checkout
         uses: actions/checkout@v4`,
@@ -178,7 +206,7 @@ export function generateDeployWorkflow(botName: string, onceEntries: OnceTimerEn
       `mkdir -p ~/.ssh
 ssh-keyscan -H "\${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts`,
     ),
-    buildStep('Upload build artifacts', `rsync -avz dist/ ${SSH_TARGET}:"\${{ secrets.DEPLOY_PATH }}"`),
+    buildStep('Upload build artifacts', buildUploadArtifactsScript(assetsEnabled)),
     buildStep('Deploy service', buildMainServiceScript(botName)),
     ...(onceEntries.length > 0 ? [buildStep('Deploy once timers', buildOnceTimersScript(botName, onceEntries))] : []),
   ];
@@ -229,11 +257,12 @@ export async function runGenerateWorkflowSsh(cwd: string): Promise<void> {
   }
 
   const onceEntries = resolveOnceTimerEntries(cwd, onceNames, config.timer);
+  const assetsEnabled = hasAssetsDir(cwd);
 
   mkdirSync(join(cwd, '.github/workflows'), { recursive: true });
   writeFileSync(
     join(cwd, '.github/workflows/deploy.yaml'),
-    generateDeployWorkflow(pkg.name, onceEntries, Boolean(config.db?.enable)),
+    generateDeployWorkflow(pkg.name, onceEntries, Boolean(config.db?.enable), assetsEnabled),
   );
 
   const lefthookPath = join(cwd, 'lefthook.yml');
