@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { createClient } from '@libsql/client';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import type { Config } from '../config';
-import { buildSchema } from '../db/buildSchema';
+import { buildSchema, buildTable } from '../db/buildSchema';
 import { applyPendingMigrations, STATEMENT_BREAKPOINT } from '../db/migrationRunner';
 import { describeUnsafeAddColumnError, findUnsafeAddColumnStatements } from './migrationSafety';
 import { rewriteModelDataBlocks } from './modelDataBlock';
@@ -28,7 +28,7 @@ export async function runDevMigrate(cwd: string): Promise<void> {
   await rewriteModelDataBlocks(cwd, modelsDir, models);
   writeSchemaFile(cwd, models);
 
-  const schema = buildSchema(models.map((m) => m.modelClass));
+  const schema = buildSchema(models.map((m) => buildTable(m.modelClass)));
   const cur = await generateSQLiteDrizzleJson(schema);
 
   mkdirSync(migrationsDir, { recursive: true });

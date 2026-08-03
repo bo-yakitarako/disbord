@@ -47,8 +47,8 @@ beforeEach(async () => {
 
   mkdirSync(join(dir, 'src/db/models'), { recursive: true });
   writeFileSync(join(dir, 'src/db/models/User.ts'), '// model');
+  writeFileSync(join(dir, 'src/db/schema.ts'), '// schema');
   mkdirSync(join(dir, '.disbord/db'), { recursive: true });
-  writeFileSync(join(dir, '.disbord/db/schema.ts'), '// schema');
   mkdirSync(join(dir, 'migrations'), { recursive: true });
   writeFileSync(join(dir, 'migrations/20260101000000.sql'), '-- sql');
   writeFileSync(join(dir, '.disbord/db/dev.db'), '');
@@ -113,7 +113,7 @@ describe('runDisable', () => {
     expect(config).toContain('coreClass: {');
 
     expect(existsSync(join(dir, 'src/db/models'))).toBe(false);
-    expect(existsSync(join(dir, '.disbord/db/schema.ts'))).toBe(false);
+    expect(existsSync(join(dir, 'src/db/schema.ts'))).toBe(false);
     expect(existsSync(join(dir, 'migrations'))).toBe(false);
     expect(existsSync(join(dir, '.disbord/db/dev.db'))).toBe(false);
     expect(existsSync(join(dir, 'src/Game.ts'))).toBe(true);
@@ -143,7 +143,7 @@ describe('runDisable', () => {
 
     const dts = readFileSync(join(dir, '.disbord/disbord.d.ts'), 'utf-8');
     expect(dts).not.toContain('Game');
-    expect(dts).toContain(`from './db/schema'`);
+    expect(dts).toContain(`from '../src/db/schema'`);
   });
 
   test('coreClassを無効化すると、有効化時に挿入されたbuttons.tsのgame引数が除去される(引数ズレ対策)', async () => {

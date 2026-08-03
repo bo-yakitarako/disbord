@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createClient } from '@libsql/client';
 import dayjs, { type Dayjs } from 'dayjs';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
-import { buildSchema } from '../src/db/buildSchema';
+import { buildSchema, buildTable } from '../src/db/buildSchema';
 import { createDbClient } from '../src/db/client';
 import { Column, Table, type ModelClass } from '../src/db/decorators';
 import { Model } from '../src/db/Model';
@@ -50,7 +50,7 @@ beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'disbord-model-'));
   const dbUrl = `file:${join(dir, 'test.db')}`;
 
-  const schema = buildSchema([Job, Reminder] as unknown as ModelClass[]);
+  const schema = buildSchema(([Job, Reminder] as unknown as ModelClass[]).map(buildTable));
   const cur = await generateSQLiteDrizzleJson(schema);
   const prev = await generateSQLiteDrizzleJson({});
   const statements = await generateSQLiteMigration(prev, cur);

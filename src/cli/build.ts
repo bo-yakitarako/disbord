@@ -146,8 +146,8 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
 
   // dev.tsと同様、`.disbord/`ごと削除されていてもbuild単体でdisbord.d.tsを再構築できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
-  // schema.tsも`.disbord/`配下(gitignore対象)のため、`disbord migrate`未実行のクリーンな
-  // チェックアウトから`disbord build`だけを叩いても.disbord/main.tsのbundleが解決できるようにする。
+  // src/db/schema.tsはmigrate時点のモデル定義から生成される派生物なので、build時点でも
+  // 最新化しておく(migrate未実行のまま手でmodelsだけ書き換えた場合との食い違いを防ぐ)。
   if (dbEnabled) {
     await regenerateSchemaFile(cwd);
   }

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { generateSQLiteDrizzleJson } from 'drizzle-kit/api';
 import { runDevMigrate } from '../src/cli/migrateRunner';
 import { scanModelFiles } from '../src/cli/scanModelFiles';
-import { buildSchema } from '../src/db/buildSchema';
+import { buildSchema, buildTable } from '../src/db/buildSchema';
 
 const DISBORD_INDEX = join(import.meta.dir, '..', 'src/index.ts');
 
@@ -36,7 +36,7 @@ describe('runDevMigrate', () => {
     mkdirSync(join(dir, '_base-models'), { recursive: true });
     writeFileSync(join(dir, '_base-models/Job.ts'), modelSource(false));
     const baseModels = await scanModelFiles(join(dir, '_base-models'));
-    const baseSnapshot = await generateSQLiteDrizzleJson(buildSchema(baseModels.map((m) => m.modelClass)));
+    const baseSnapshot = await generateSQLiteDrizzleJson(buildSchema(baseModels.map((m) => buildTable(m.modelClass))));
     mkdirSync(join(dir, 'migrations'), { recursive: true });
     writeFileSync(join(dir, 'migrations/_snapshot.json'), JSON.stringify(baseSnapshot, null, 2));
 

@@ -145,7 +145,7 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
   const disbordImports = buildDisbordImports(dbEnabled, hasButtons, hasSelectMenus);
   const buttonsImport = optionalLine(hasButtons, `\nimport buttons from '../src/components/buttons';`);
   const selectMenusImport = optionalLine(hasSelectMenus, `\nimport selectMenus from '../src/components/selectMenus';`);
-  const schemaImport = optionalLine(dbEnabled, `\nimport { schema } from './db/schema';`);
+  const schemaImport = optionalLine(dbEnabled, `\nimport { schema } from '../src/db/schema';`);
   const dbInit = optionalLine(
     dbEnabled,
     `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`,

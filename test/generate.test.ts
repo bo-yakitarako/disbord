@@ -229,7 +229,7 @@ describe('generateMainSource', () => {
   test('dbEnabled: trueはschema importとcreateDbClient呼び出し(config.db由来のTurso接続情報付き)を含む', () => {
     const source = generateMainSource([], { dbEnabled: true });
     expect(source).toContain('createDbClient');
-    expect(source).toContain(`import { schema } from './db/schema';`);
+    expect(source).toContain(`import { schema } from '../src/db/schema';`);
     expect(source).toContain(
       'createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });',
     );

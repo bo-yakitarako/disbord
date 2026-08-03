@@ -1,9 +1,52 @@
 import dayjs from 'dayjs';
 import { relations, sql } from 'drizzle-orm';
-import { index, integer, primaryKey, real, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  unique,
+  type AnySQLiteColumn,
+  type AnySQLiteTable,
+  type SQLiteTableWithColumns,
+} from 'drizzle-orm/sqlite-core';
 import { readModelMeta, type ColumnMeta, type ModelClass, type ModelMeta, type RelateMeta } from './decorators';
+import type { BaseProps, Model } from './Model';
 
 export type { ModelClass } from './decorators';
+
+/**
+ * `M`が`Model<Data>`を継承したクラスなら、その`Data`（`namespace Xxx { export type Data }`が
+ * `disbord migrate`等で自動生成する型）を取り出す。`@Relate(() => User as unknown as ModelClass)`
+ * のように型を消して渡している箇所は`ModelClass`止まりで`Data`が引けないため、その場合は
+ * `Record<string, unknown>`にフォールバックする(buildTable自体の呼び出しは常に実クラスを渡す
+ * ため、生成されたschema.tsでは通常フォールバックしない)。
+ */
+type ModelDataOf<M extends ModelClass> = InstanceType<M> extends Model<infer D> ? D : Record<string, unknown>;
+
+type TableRowOf<M extends ModelClass> = BaseProps & ModelDataOf<M>;
+
+/**
+ * `buildTable()`の戻り値を「実際にどのdrizzleビルダーで組み立てたか」ではなく、
+ * `Model<Data>`のData型が持つ各プロパティのJS上の値の型だけから機械的に組み立てる。
+ * `timestamp_ms`カラムのData型は`Date | Dayjs`（create()/update()の入力を広く受けるため）
+ * だが、DBから読み出した値は常に`Date`なので、select結果の型としてはやや広め（安全側）になる。
+ */
+type TableColumnsOf<M extends ModelClass> = {
+  [K in keyof TableRowOf<M>]: AnySQLiteColumn<{
+    name: K & string;
+    data: TableRowOf<M>[K];
+  }>;
+};
+
+export type TableOf<M extends ModelClass> = SQLiteTableWithColumns<{
+  name: string;
+  schema: undefined;
+  columns: TableColumnsOf<M>;
+  dialect: 'sqlite';
+}>;
 
 export function toSnakeCase(property: string): string {
   return property.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
@@ -96,6 +139,22 @@ function buildIdColumn(meta: ModelMeta): any {
   return meta.primaryKeys.length > 0 ? base.unique() : base.primaryKey();
 }
 
+/**
+ * `buildTable()`が組み立てたテーブルをモデルクラスから引けるようにする登録簿。
+ * `.references()`に渡すコールバックはdrizzleが遅延評価するため、参照先が自分より後に
+ * `buildTable()`される場合（相互参照・自己参照）でも、実際に評価される頃には登録済みになる。
+ */
+const modelTables = new WeakMap<ModelClass, AnySQLiteTable>();
+const tableRegistrations = new WeakMap<AnySQLiteTable, { model: ModelClass; meta: ModelMeta }>();
+
+function resolveTargetTable(model: ModelClass): AnySQLiteTable {
+  const table = modelTables.get(model);
+  if (!table) {
+    throw new Error(`disbord: ${model.name}のテーブルが見つかりません。先にbuildTable(${model.name})を呼んでください`);
+  }
+  return table;
+}
+
 function resolveDbNames(meta: ModelMeta): Map<string, string> {
   const names = new Map<string, string>([
     ['id', 'id'],
@@ -112,12 +171,7 @@ function resolveDbNames(meta: ModelMeta): Map<string, string> {
  * カラム順は`id`→モデル自身が宣言したカラム→`created_at`/`updated_at`にする
  * (オブジェクトのkey挿入順がそのままCREATE TABLEの列順になるため、この並びで組み立てる)。
  */
-function buildTableColumns(
-  meta: ModelMeta,
-  dbNames: Map<string, string>,
-  tableNameByModel: Map<ModelClass, string>,
-  tables: Record<string, any>,
-) {
+function buildTableColumns(meta: ModelMeta, dbNames: Map<string, string>) {
   const columns: Record<string, any> = { id: buildIdColumn(meta) };
 
   const relatesByProperty = new Map(meta.relates.map((relate) => [relate.property, relate] as const));
@@ -125,8 +179,7 @@ function buildTableColumns(
     let builder = createColumnBuilder(dbNames.get(property)!, colMeta);
     const relate = relatesByProperty.get(property);
     if (relate) {
-      const targetTableName = tableNameByModel.get(relate.target())!;
-      builder = builder.references(() => tables[targetTableName]!.id, {
+      builder = builder.references(() => (resolveTargetTable(relate.target()) as any).id, {
         onDelete: relate.options.onDelete,
         onUpdate: relate.options.onUpdate,
       });
@@ -207,17 +260,37 @@ function buildRelationsSchema(
   return result;
 }
 
-export function buildSchema(models: ModelClass[]): Record<string, unknown> {
-  const metas = models.map((model) => ({ model, meta: readModelMeta(model) }));
+/**
+ * モデルクラス1つにつき1つのテーブルを組み立てる。他のモデルへの`@Relate`は`buildSchema()`で
+ * まとめて渡された時点で解決されるため、ここでは呼び出し順を気にせず個別に呼び出せる
+ * （相互参照・自己参照はmodelTables/`resolveTargetTable`の遅延解決で対応する）。
+ */
+export function buildTable<M extends ModelClass>(model: M): TableOf<M> {
+  const meta = readModelMeta(model);
+  const dbNames = resolveDbNames(meta);
+  const columns = buildTableColumns(meta, dbNames);
+  const table = sqliteTable(meta.tableName, columns as any, buildExtraConfig(meta, dbNames) as any) as AnySQLiteTable;
+  modelTables.set(model, table);
+  tableRegistrations.set(table, { model, meta });
+  return table as unknown as TableOf<M>;
+}
+
+/**
+ * `buildTable()`で作った個々のテーブルを受け取り、relations()を含む完全なdrizzleスキーマに
+ * まとめる。テーブルからモデルのメタデータを引くため、渡すテーブルは必ず`buildTable()`の
+ * 戻り値でなければならない。
+ */
+export function buildSchema(tables: AnySQLiteTable[]): Record<string, unknown> {
+  const metas = tables.map((table) => {
+    const registration = tableRegistrations.get(table);
+    if (!registration) {
+      throw new Error('disbord: buildSchema()にはbuildTable()で作成したテーブルを渡してください');
+    }
+    return registration;
+  });
   const tableNameByModel = new Map(metas.map(({ model, meta }) => [model, meta.tableName] as const));
+  const tablesByName = Object.fromEntries(metas.map(({ meta }, i) => [meta.tableName, tables[i]]));
 
-  const tables: Record<string, any> = {};
-  for (const { meta } of metas) {
-    const dbNames = resolveDbNames(meta);
-    const columns = buildTableColumns(meta, dbNames, tableNameByModel, tables);
-    tables[meta.tableName] = sqliteTable(meta.tableName, columns as any, buildExtraConfig(meta, dbNames) as any);
-  }
-
-  const relationsSchema = buildRelationsSchema(metas, tables, tableNameByModel);
-  return { ...tables, ...relationsSchema };
+  const relationsSchema = buildRelationsSchema(metas, tablesByName, tableNameByModel);
+  return { ...tablesByName, ...relationsSchema };
 }

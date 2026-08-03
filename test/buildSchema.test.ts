@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import dayjs, { type Dayjs } from 'dayjs';
 import { generateSQLiteDrizzleJson, generateSQLiteMigration } from 'drizzle-kit/api';
 import { createTableRelationsHelpers, Many, One } from 'drizzle-orm';
-import { buildSchema } from '../src/db/buildSchema';
+import type { AnySQLiteTable } from 'drizzle-orm/sqlite-core';
+import { buildSchema, buildTable } from '../src/db/buildSchema';
 import { Column, CompoundIndex, Index, Relate, Table, Unique, type ModelClass } from '../src/db/decorators';
 import { Model } from '../src/db/Model';
 
@@ -44,6 +45,10 @@ class WorkTime extends Model {
 
 const models = [User, Job, WorkTime] as unknown as ModelClass[];
 
+function buildTables(ms: ModelClass[]): AnySQLiteTable[] {
+  return ms.map((m) => buildTable(m));
+}
+
 async function migrationSqlFor(schema: Record<string, unknown>): Promise<string> {
   const prev = await generateSQLiteDrizzleJson({});
   const cur = await generateSQLiteDrizzleJson(schema);
@@ -52,21 +57,21 @@ async function migrationSqlFor(schema: Record<string, unknown>): Promise<string>
 
 describe('buildSchema', () => {
   test('各モデルごとにテーブルとrelationsを1つずつ生成する', () => {
-    const schema = buildSchema(models);
+    const schema = buildSchema(buildTables(models));
     expect(Object.keys(schema).sort()).toEqual(
       ['jobs', 'jobsRelations', 'users', 'usersRelations', 'workTimes', 'workTimesRelations'].sort(),
     );
   });
 
   test('全モデル共通でid/createdAt/updatedAtが自動付与される', async () => {
-    const sql = await migrationSqlFor(buildSchema([User] as unknown as ModelClass[]));
+    const sql = await migrationSqlFor(buildSchema(buildTables([User] as unknown as ModelClass[])));
     expect(sql).toContain('`id` text PRIMARY KEY NOT NULL');
     expect(sql).toContain('`created_at` integer NOT NULL');
     expect(sql).toContain('`updated_at` integer NOT NULL');
   });
 
   test('カラム順はid→モデル自身が宣言したカラム(宣言順)→created_at→updated_atになる', async () => {
-    const sql = await migrationSqlFor(buildSchema([User] as unknown as ModelClass[]));
+    const sql = await migrationSqlFor(buildSchema(buildTables([User] as unknown as ModelClass[])));
     const idIdx = sql.indexOf('`id`');
     const emailIdx = sql.indexOf('`email`');
     const nameIdx = sql.indexOf('`name`');
@@ -81,24 +86,24 @@ describe('buildSchema', () => {
   });
 
   test('@Relateは.references()によるFOREIGN KEYを生成する', async () => {
-    const sql = await migrationSqlFor(buildSchema(models));
+    const sql = await migrationSqlFor(buildSchema(buildTables(models)));
     expect(sql).toContain('FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade');
     expect(sql).toContain('FOREIGN KEY (`job_id`) REFERENCES `jobs`(`id`) ON UPDATE no action ON DELETE set null');
   });
 
   test('@Uniqueは単一カラムのUNIQUE制約を生成する', async () => {
-    const sql = await migrationSqlFor(buildSchema(models));
+    const sql = await migrationSqlFor(buildSchema(buildTables(models)));
     expect(sql).toContain('CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`)');
   });
 
   test('@Indexは単一カラムのindexを、@CompoundIndexは複数カラムのindexを生成する(index名もカラム名同様snake_case)', async () => {
-    const sql = await migrationSqlFor(buildSchema(models));
+    const sql = await migrationSqlFor(buildSchema(buildTables(models)));
     expect(sql).toContain('CREATE INDEX `workTimes_acted_at_idx` ON `workTimes` (`acted_at`)');
     expect(sql).toContain('CREATE INDEX `workTimes_user_id_job_id_idx` ON `workTimes` (`user_id`,`job_id`)');
   });
 
   test('@Relateは参照先(belongs-to)と逆側(has-many)の双方向relations()を生成する', () => {
-    const schema = buildSchema(models);
+    const schema = buildSchema(buildTables(models));
     const usersRelations = schema.usersRelations as { table: unknown; config: (h: unknown) => Record<string, unknown> };
     const jobsRelations = schema.jobsRelations as { table: unknown; config: (h: unknown) => Record<string, unknown> };
 
@@ -118,9 +123,9 @@ describe('buildSchema', () => {
   });
 
   test('差分がない2回目のbuildSchemaはmigration文を生成しない', async () => {
-    const schema = buildSchema(models);
+    const schema = buildSchema(buildTables(models));
     const prev = await generateSQLiteDrizzleJson(schema);
-    const cur = await generateSQLiteDrizzleJson(buildSchema(models));
+    const cur = await generateSQLiteDrizzleJson(buildSchema(buildTables(models)));
     const statements = await generateSQLiteMigration(prev, cur);
     expect(statements).toEqual([]);
   });
@@ -134,7 +139,7 @@ describe("mode: 'timestamp_ms'でdefault: 'now'を指定した場合", () => {
   }
 
   test("DB側のDEFAULT (unixepoch('subsec') * 1000)（挿入時刻・ミリ秒精度）になる", async () => {
-    const sql = await migrationSqlFor(buildSchema([Reminder] as unknown as ModelClass[]));
+    const sql = await migrationSqlFor(buildSchema(buildTables([Reminder] as unknown as ModelClass[])));
     expect(sql).toContain(`\`fired_at\` integer DEFAULT (unixepoch('subsec') * 1000) NOT NULL`);
   });
 
@@ -145,7 +150,7 @@ describe("mode: 'timestamp_ms'でdefault: 'now'を指定した場合", () => {
   }
 
   test("mode: 'timestamp_ms'以外では'now'は単なる文字列リテラルのdefaultとして扱われる(特別扱いしない)", async () => {
-    const sql = await migrationSqlFor(buildSchema([Note] as unknown as ModelClass[]));
+    const sql = await migrationSqlFor(buildSchema(buildTables([Note] as unknown as ModelClass[])));
     expect(sql).toContain("`label` text DEFAULT 'now' NOT NULL");
     expect(sql).not.toContain('unixepoch');
   });
@@ -157,7 +162,7 @@ describe("mode: 'timestamp_ms'でdefault: 'now'を指定した場合", () => {
   }
 
   test('固定値のDayjsを指定した場合、ミリ秒unix時間の整数リテラルがDEFAULTになる(生のDateを渡すとJSON文字列化されて壊れるため変換する)', async () => {
-    const sql = await migrationSqlFor(buildSchema([Alarm] as unknown as ModelClass[]));
+    const sql = await migrationSqlFor(buildSchema(buildTables([Alarm] as unknown as ModelClass[])));
     expect(sql).toContain('`fired_at` integer DEFAULT 1767225600000 NOT NULL');
   });
 });

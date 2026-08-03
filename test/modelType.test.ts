@@ -54,7 +54,7 @@ describe('runModelType', () => {
     expect(content).toContain('export namespace Job {');
     expect(content).toContain('export type Data = { sample: string };');
 
-    expect(() => readFileSync(join(dir, '.disbord/db/schema.ts'), 'utf-8')).toThrow();
+    expect(() => readFileSync(join(dir, 'src/db/schema.ts'), 'utf-8')).toThrow();
     expect(() => readFileSync(join(dir, 'migrations/_snapshot.json'), 'utf-8')).toThrow();
   });
 });

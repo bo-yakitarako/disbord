@@ -325,7 +325,7 @@ export function generateDisbordDts(options: {
     `\nimport type { ${coreClassName} } from '@/${coreClassName}';`,
   );
   const coreField = optionalLine(options.coreClass, `\n    core: InstanceType<typeof ${coreClassName}>;`);
-  const schemaImportLine = optionalLine(options.db, `\nimport type { schema } from './db/schema';`);
+  const schemaImportLine = optionalLine(options.db, `\nimport type { schema } from '../src/db/schema';`);
   const schemaField = optionalLine(options.db, '\n    schema: typeof schema;');
   const buttonsImportLine = optionalLine(buttonsEnabled, `\nimport type buttons from '@/components/buttons';`);
   const buttonsField = optionalLine(buttonsEnabled, '\n    buttons: typeof buttons;');

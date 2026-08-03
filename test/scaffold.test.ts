@@ -185,7 +185,7 @@ describe('generateDisbordDts', () => {
 
   test('db有効時はschemaのimportとRegistryフィールドを含む', () => {
     const source = generateDisbordDts({ db: true, coreClass: false });
-    expect(source).toContain(`import type { schema } from './db/schema';`);
+    expect(source).toContain(`import type { schema } from '../src/db/schema';`);
     expect(source).toContain('schema: typeof schema;');
   });
 

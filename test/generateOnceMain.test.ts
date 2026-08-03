@@ -53,9 +53,9 @@ describe('generateOnceMainSource', () => {
     expect(source).not.toContain('db/schema');
   });
 
-  test('dbEnabled: trueは.disbord/db/schemaからのimportとcreateDbClient呼び出しを含む(.disbord/once/配下からの相対パスのため.disbord/main.tsと異なりschemaは../db/schema)', () => {
+  test('dbEnabled: trueはsrc/db/schemaからのimportとcreateDbClient呼び出しを含む(.disbord/once/配下から2階層深い相対パスのため.disbord/main.tsの../src/db/schemaと違い../../src/db/schema)', () => {
     const source = generateOnceMainSource('notice', { dbEnabled: true });
-    expect(source).toContain(`import { schema } from '../db/schema';`);
+    expect(source).toContain(`import { schema } from '../../src/db/schema';`);
     expect(source).toContain(
       'createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });',
     );

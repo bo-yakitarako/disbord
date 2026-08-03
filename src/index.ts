@@ -5,7 +5,7 @@ export { createCoreStore, resolveInstanceKey, type CoreStore } from './core/stor
 export { db } from './db/db';
 export { createDbClient } from './db/client';
 export { Model, type BaseProps } from './db/Model';
-export { buildSchema, type ModelClass } from './db/buildSchema';
+export { buildSchema, buildTable, type ModelClass } from './db/buildSchema';
 export {
   Column,
   CompoundIndex,

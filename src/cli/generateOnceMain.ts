@@ -27,8 +27,8 @@ export type GenerateOnceMainSourceOptions = {
 /**
  * `.disbord/once/<name>.ts`（`disbord once`/`disbord build`が生成する実実行ファイル）のソース。
  * bot本体のように常駐せず、readyイベントの最後に`client.destroy()`を呼んで1回で終了する。
- * 生成先が`.disbord/once/`（1階層深い）ため相対importの深さに注意
- * （disbord.config.ts/src/配下は`../../`、schema.tsのみ`.disbord/db/`配下で`../`）。
+ * 生成先が`.disbord/once/`（2階層深い）ため相対importの深さに注意
+ * （disbord.config.ts/src/配下は`../../`、schema.tsも`src/db/`配下なので同じく`../../`）。
  */
 export function generateOnceMainSource(name: string, options: GenerateOnceMainSourceOptions = {}): string {
   const origin = options.origin ?? 'once';
@@ -40,7 +40,7 @@ export function generateOnceMainSource(name: string, options: GenerateOnceMainSo
     ...(dbEnabled ? ['createDbClient'] : []),
     ...(coreClassName ? ['createCoreStore'] : []),
   ];
-  const schemaImport = dbEnabled ? `\nimport { schema } from '../db/schema';` : '';
+  const schemaImport = dbEnabled ? `\nimport { schema } from '../../src/db/schema';` : '';
   const dbInit = dbEnabled
     ? `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`
     : '';
