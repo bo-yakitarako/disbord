@@ -60,7 +60,13 @@ export function buildDistMiseToml(baseMiseToml: string, onceNames: string[]): st
 async function buildOnceScripts(
   cwd: string,
   onceNames: string[],
-  options: { dbEnabled: boolean; coreClassName?: string; external: string[] },
+  options: {
+    dbEnabled: boolean;
+    coreClassName?: string;
+    hasButtons: boolean;
+    hasSelectMenus: boolean;
+    external: string[];
+  },
 ): Promise<void> {
   if (onceNames.length === 0) return;
 
@@ -73,6 +79,8 @@ async function buildOnceScripts(
         origin: 'build',
         dbEnabled: options.dbEnabled,
         coreClassName: options.coreClassName,
+        hasButtons: options.hasButtons,
+        hasSelectMenus: options.hasSelectMenus,
       }),
     );
 
@@ -166,7 +174,13 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
   });
 
   const onceNames = scanOnceFiles(join(cwd, 'src/once'));
-  await buildOnceScripts(cwd, onceNames, { dbEnabled, coreClassName, external: [...external] });
+  await buildOnceScripts(cwd, onceNames, {
+    dbEnabled,
+    coreClassName,
+    hasButtons,
+    hasSelectMenus,
+    external: [...external],
+  });
 
   const baseMiseToml = readFileSync(join(cwd, 'mise.toml'), 'utf-8');
   writeFileSync(join(cwd, 'dist/mise.toml'), buildDistMiseToml(baseMiseToml, onceNames));

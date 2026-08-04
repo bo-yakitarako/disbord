@@ -86,4 +86,43 @@ describe('generateOnceMainSource', () => {
     expect(source).toContain("import { GameMaster } from '../../src/GameMaster';");
     expect(source).toContain('() => new GameMaster()');
   });
+
+  test('hasButtons/hasSelectMenus省略時(デフォルトfalse)はbuttons/selectMenusのimport・setComponentsStateを一切含まない', () => {
+    const source = generateOnceMainSource('notice');
+    expect(source).not.toContain('buttons');
+    expect(source).not.toContain('selectMenus');
+    expect(source).not.toContain('setComponentsState');
+  });
+
+  test('hasButtons: trueはbuttons.tsをimportしsetComponentsStateへ渡す(makeButtonRowをonceスクリプトから使えるように)', () => {
+    const source = generateOnceMainSource('notice', { hasButtons: true });
+    expect(source).toContain(`import buttons from '../../src/components/buttons';`);
+    expect(source).toContain('setComponentsState({ buttons, argsSplitter: config.argsSplitter });');
+  });
+
+  test('hasSelectMenus: trueはselectMenus.tsをimportしsetComponentsStateへ渡す', () => {
+    const source = generateOnceMainSource('notice', { hasSelectMenus: true });
+    expect(source).toContain(`import selectMenus from '../../src/components/selectMenus';`);
+    expect(source).toContain('setComponentsState({ selectMenus, argsSplitter: config.argsSplitter });');
+  });
+
+  test('hasButtons/hasSelectMenusともにtrueは両方をsetComponentsStateへ渡す', () => {
+    const source = generateOnceMainSource('notice', { hasButtons: true, hasSelectMenus: true });
+    expect(source).toContain('setComponentsState({ buttons, selectMenus, argsSplitter: config.argsSplitter });');
+  });
+
+  test('hasButtons: trueでもinteractionのルーティング(routeButtonInteraction/InteractionCreate)は含まない(onceはinteractionを扱わないため)', () => {
+    const source = generateOnceMainSource('notice', { hasButtons: true, hasSelectMenus: true });
+    expect(source).not.toContain('InteractionCreate');
+    expect(source).not.toContain('routeButtonInteraction');
+    expect(source).not.toContain('routeSelectMenuInteraction');
+  });
+
+  test('setComponentsStateはClient生成より前に呼ばれる', () => {
+    const source = generateOnceMainSource('notice', { hasButtons: true });
+    const setStateIdx = source.indexOf('setComponentsState(');
+    const clientIdx = source.indexOf('new Client(');
+    expect(setStateIdx).toBeGreaterThan(-1);
+    expect(setStateIdx).toBeLessThan(clientIdx);
+  });
 });

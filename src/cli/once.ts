@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnWithDotenvx, type EnvTarget } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
+import { scanComponentFiles } from './generate';
 import { generateOnceMainSource } from './generateOnceMain';
 import { readBotConfig } from './readBotConfig';
 import { regenerateSchemaFile } from './schemaGen';
@@ -40,6 +41,7 @@ export async function runOnce(name: string, production: boolean, cwd: string): P
   const config = await readBotConfig(cwd);
   const dbEnabled = Boolean(config.db?.enable);
   const coreClassName = config.coreClass?.enable ? config.coreClass.className : undefined;
+  const { hasButtons, hasSelectMenus } = scanComponentFiles(join(cwd, 'src/components'));
 
   // `.disbord/`ごと削除されていても単体で完結できるようにする。
   regenerateDisbordDtsFromConfig(cwd, config);
@@ -48,7 +50,10 @@ export async function runOnce(name: string, production: boolean, cwd: string): P
   }
 
   const mainPath = join(cwd, `.disbord/once/${name}.ts`);
-  writeFileSync(mainPath, generateOnceMainSource(name, { origin: 'once', dbEnabled, coreClassName }));
+  writeFileSync(
+    mainPath,
+    generateOnceMainSource(name, { origin: 'once', dbEnabled, coreClassName, hasButtons, hasSelectMenus }),
+  );
 
   const envTarget: EnvTarget = production ? 'production' : 'development';
   const child = spawnWithDotenvx(cwd, envTarget, ['bun', mainPath]);
