@@ -151,6 +151,22 @@ export abstract class Model<Data extends Record<string, unknown> = Record<string
     return rows.map((row) => new this(row as never));
   }
 
+  public static async findDistinct<C extends Model<any>, K extends keyof ModelData<C>>(
+    this: ModelClass<C>,
+    columns: K[],
+    query: Partial<BaseProps & ModelData<C>> = {},
+  ): Promise<Pick<ModelData<C>, K>[]> {
+    const where = buildWhereClause(this.table, normalizeDayjsValues(query as Record<string, unknown>));
+    const tableColumns = getTableColumns(this.table as never) as Record<string, unknown>;
+    const selection = Object.fromEntries(columns.map((column) => [column, tableColumns[column as string]]));
+
+    const builder = getDbState()
+      .db.selectDistinct(selection as never)
+      .from(this.table as never);
+    const rows = await (where ? builder.where(where) : builder);
+    return rows as Pick<ModelData<C>, K>[];
+  }
+
   public static async updateAll<C extends Model<any>>(
     this: ModelClass<C>,
     condition: Partial<BaseProps & ModelData<C>>,

@@ -148,6 +148,40 @@ describe('Model.exists()', () => {
   });
 });
 
+describe('Model.findDistinct()', () => {
+  test('指定したカラムの重複を排除したプレーンなオブジェクト配列を返す', async () => {
+    await Reminder.create({ status: 'pending', title: 'foo' });
+    await Reminder.create({ status: 'pending', title: 'bar' });
+    await Reminder.create({ status: 'done', title: 'baz' });
+
+    const statuses = await Reminder.findDistinct(['status']);
+
+    expect(statuses).toHaveLength(2);
+    expect(new Set(statuses.map((row) => row.status))).toEqual(new Set(['pending', 'done']));
+  });
+
+  test('query条件で絞り込める', async () => {
+    await Reminder.create({ status: 'pending', title: 'foo' });
+    await Reminder.create({ status: 'pending', title: 'bar' });
+    await Reminder.create({ status: 'done', title: 'baz' });
+
+    const statuses = await Reminder.findDistinct(['status'], { status: 'pending' });
+
+    expect(statuses).toEqual([{ status: 'pending' }]);
+  });
+
+  test('複数カラムを指定すると、その組み合わせで重複を排除する', async () => {
+    await Job.create({ sample: 'x', scheduledAt: dayjs('2026-01-01T00:00:00.000Z') } as never);
+    await Job.create({ sample: 'x', scheduledAt: dayjs('2026-01-01T00:00:00.000Z') } as never);
+    await Job.create({ sample: 'y', scheduledAt: dayjs('2026-01-01T00:00:00.000Z') } as never);
+
+    const rows = await Job.findDistinct(['sample']);
+
+    expect(new Set(rows.map((row) => row.sample))).toEqual(new Set(['x', 'y']));
+    expect(rows).toHaveLength(2);
+  });
+});
+
 describe('@Columnにdefaultが指定されたカラムの省略', () => {
   test('create()呼び出し時にキャスト無しで省略でき、DB側のdefault値が入る', async () => {
     const reminder = await Reminder.create({ title: 'foo' });
