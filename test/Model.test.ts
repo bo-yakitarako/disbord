@@ -182,6 +182,34 @@ describe('Model.findDistinct()', () => {
   });
 });
 
+describe('Model.create()の配列渡し', () => {
+  test('配列を渡すと一括INSERTされ、生成されたインスタンスの配列が返る', async () => {
+    const reminders = await Reminder.create([
+      { status: 'pending', title: 'foo' },
+      { status: 'done', title: 'bar' },
+    ]);
+
+    expect(reminders).toHaveLength(2);
+    expect(reminders.map((r) => r.title)).toEqual(['foo', 'bar']);
+    expect(reminders.map((r) => r.status)).toEqual(['pending', 'done']);
+    expect(reminders.every((r) => typeof r.id === 'string')).toBe(true);
+
+    expect(await Reminder.findMany()).toHaveLength(2);
+  });
+
+  test('単体オブジェクトを渡した場合は従来通り単一のインスタンスが返る', async () => {
+    const reminder = await Reminder.create({ title: 'foo' });
+    expect(Array.isArray(reminder)).toBe(false);
+    expect(reminder.title).toBe('foo');
+  });
+
+  test('空配列を渡すとINSERTを実行せず空配列を返す', async () => {
+    const reminders = await Reminder.create([]);
+    expect(reminders).toEqual([]);
+    expect(await Reminder.exists()).toBe(false);
+  });
+});
+
 describe('@Columnにdefaultが指定されたカラムの省略', () => {
   test('create()呼び出し時にキャスト無しで省略でき、DB側のdefault値が入る', async () => {
     const reminder = await Reminder.create({ title: 'foo' });

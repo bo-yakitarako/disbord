@@ -106,17 +106,35 @@ export abstract class Model<Data extends Record<string, unknown> = Record<string
     return getDbState().schema[this.tableName] as Record<string, unknown>;
   }
 
-  public static async create<C extends Model<any>>(this: ModelClass<C>, data: ModelData<C>): Promise<C> {
+  public static async create<C extends Model<any>>(this: ModelClass<C>, data: ModelData<C>): Promise<C>;
+  public static async create<C extends Model<any>>(this: ModelClass<C>, data: ModelData<C>[]): Promise<C[]>;
+  public static async create<C extends Model<any>>(
+    this: ModelClass<C>,
+    data: ModelData<C> | ModelData<C>[],
+  ): Promise<C | C[]> {
+    const isBulk = Array.isArray(data);
+    if (isBulk && data.length === 0) {
+      return [];
+    }
+
     const now = new Date();
-    const [inserted] = (await getDbState()
+    const values = (isBulk ? data : [data]).map((item) => ({
+      ...normalizeDayjsValues(item as Record<string, unknown>),
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    const inserted = (await getDbState()
       .db.insert(this.table as never)
-      .values({ ...normalizeDayjsValues(data as Record<string, unknown>), createdAt: now, updatedAt: now } as never)
+      .values(values as never)
       .returning()) as unknown[];
 
-    if (!inserted) {
+    if (inserted.length !== values.length) {
       throw new Error('Failed to insert record');
     }
-    return new this(inserted as never);
+
+    const instances = inserted.map((row) => new this(row as never));
+    return isBulk ? instances : instances[0]!;
   }
 
   public static async find<C extends Model<any>>(
