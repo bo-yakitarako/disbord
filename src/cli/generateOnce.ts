@@ -33,8 +33,8 @@ export async function runGenerateOnce(name: string, cwd: string): Promise<void> 
 
   // SSH+systemdデプロイ(`disbord generate workflow ssh`)を使っていない状態でtimerを登録しても
   // 参照先のsystemd timerユニットが無く意味を持たないため、`.github/workflows/deploy.yaml`が
-  // SSHデプロイ用として既に存在する場合のみデフォルト値を登録する。それ以外のケースでは
-  // `disbord generate workflow ssh`実行時にsrc/once配下の実ファイルから逆算して補完する。
+  // SSHデプロイ用として既に存在する場合のみデフォルト値を登録する。それ以外のケースではtimerを
+  // 明示的に設定するまでdeploy.yamlのデプロイ対象に含めない(手動実行専用として扱う)。
   if (hasSshDeployWorkflow(cwd)) {
     const configPath = join(cwd, 'disbord.config.ts');
     writeFileSync(configPath, addTimerEntry(readFileSync(configPath, 'utf-8'), name));

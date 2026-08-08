@@ -324,7 +324,7 @@ describe('runGenerateWorkflowSsh', () => {
     }
   });
 
-  test('onceスクリプトがあるのにtimer設定が無い場合、disbord.config.tsへデフォルトcronのtimerを補完してdeploy.yamlに含める', async () => {
+  test('onceスクリプトがあるのにtimer設定が無い場合、disbord.config.tsへ補完せずdeploy.yamlからも除外する', async () => {
     const dir = await setupDir();
     try {
       await mkdir(join(dir, 'src/once'), { recursive: true });
@@ -333,12 +333,11 @@ describe('runGenerateWorkflowSsh', () => {
       await runGenerateWorkflowSsh(dir);
 
       const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
-      expect(config).toContain(`timer: {\n    notice: '*-*-* *:00:00',\n  },`);
+      expect(config).toBe(BASE_CONFIG);
 
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
-      expect(content).toContain('- name: Deploy once timers');
-      expect(content).toContain('my-bot-notice.service');
-      expect(content).toContain('OnCalendar=*-*-* *:00:00');
+      expect(content).not.toContain('- name: Deploy once timers');
+      expect(content).not.toContain('my-bot-notice');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -389,7 +388,7 @@ describe('runGenerateWorkflowSsh', () => {
     }
   });
 
-  test('複数のonceスクリプトのうち一部だけtimer未設定の場合、その分だけデフォルト値を補完する', async () => {
+  test('複数のonceスクリプトのうち一部だけtimer未設定の場合、設定済みの分だけdeploy.yamlに含み未設定分は補完しない', async () => {
     const dir = await setupDir();
     try {
       await mkdir(join(dir, 'src/once'), { recursive: true });
@@ -404,11 +403,11 @@ describe('runGenerateWorkflowSsh', () => {
 
       const config = await readFile(join(dir, 'disbord.config.ts'), 'utf-8');
       expect(config).toContain(`notice: '0 9 * * *'`);
-      expect(config).toContain(`cleanup: '*-*-* *:00:00'`);
+      expect(config).not.toContain('cleanup');
 
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).toContain('my-bot-notice');
-      expect(content).toContain('my-bot-cleanup');
+      expect(content).not.toContain('my-bot-cleanup');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

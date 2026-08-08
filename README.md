@@ -170,7 +170,7 @@ export namespace Job {
 
 ## デプロイ（`.github/workflows/`）
 
-`disbord generate workflow ssh`で`.github/workflows/deploy.yaml`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（`--user`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、`disbord.config.ts`の`timer`で指定したスケジュールで定期実行します（`timer`未設定のonceスクリプトには、このコマンド実行時にデフォルト値が自動で補完されます）。`lefthook.yml`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
+`disbord generate workflow ssh`で`.github/workflows/deploy.yaml`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（`--user`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、`disbord.config.ts`の`timer`で指定したスケジュールで定期実行します（`timer`が未設定のonceスクリプトは手動実行専用とみなし、`disbord.config.ts`への自動補完もdeploy.yamlへのデプロイ対象への追加も行いません）。`lefthook.yml`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
 
 ## エラーハンドリング
 
