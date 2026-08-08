@@ -12,13 +12,16 @@ import { getComponentsState } from './state';
 import type { SelectMenuComponent, SelectMenuRegistration } from './types';
 
 function buildSelectMenuComponent(key: string, spec: SelectMenuComponent, separator: string): StringSelectMenuBuilder {
-  const options = spec.options.map((option) =>
-    new StringSelectMenuOptionBuilder()
-      .setLabel(option.label)
-      .setValue(option.value)
-      .setDescription(option.description ?? option.label)
-      .setDefault(option.default ?? false),
-  );
+  const options = spec.options.map(({ label, value, description, default: defaultValue }) => {
+    const option = new StringSelectMenuOptionBuilder()
+      .setLabel(label)
+      .setValue(value)
+      .setDefault(defaultValue ?? false);
+    if (description !== undefined) {
+      option.setDescription(description);
+    }
+    return option;
+  });
   const builder = new StringSelectMenuBuilder()
     .setCustomId(buildCustomId(key, spec.args, separator))
     .addOptions(options);
