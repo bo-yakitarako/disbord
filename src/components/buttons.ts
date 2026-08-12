@@ -52,7 +52,9 @@ function buildButtonRow<R extends ButtonRegistration<any>>(
 
 type Registration = RegistryOf<'buttons', ButtonRegistration<any>>;
 
-export function makeButtonRow(...items: ButtonRowItem<Registration>[]): ActionRowBuilder<ButtonBuilder> {
+export type ButtonInfoArg = ButtonRowItem<Registration>;
+
+export function makeButtonRow(...items: ButtonInfoArg[]): ActionRowBuilder<ButtonBuilder> {
   const state = getComponentsState();
   if (!state.buttons) {
     throw new Error(

@@ -51,6 +51,10 @@ function buildSelectMenuRow<R extends SelectMenuRegistration<any>, K extends key
 
 type Registration = RegistryOf<'selectMenus', SelectMenuRegistration<any>>;
 
+export type SelectMenuInfoArg = {
+  [K in keyof Registration]: [K, ...ComponentArgs<Registration[K]['component']>];
+}[keyof Registration];
+
 export function makeSelectMenuRow<K extends keyof Registration>(
   key: K,
   ...args: ComponentArgs<Registration[K]['component']>

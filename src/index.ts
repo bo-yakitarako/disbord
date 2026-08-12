@@ -20,14 +20,14 @@ export {
   type ColumnType,
   type RelateOptions,
 } from './db/decorators';
-export { makeButtonRow, routeButtonInteraction } from './components/buttons';
+export { makeButtonRow, routeButtonInteraction, type ButtonInfoArg } from './components/buttons';
 export {
   type ButtonInteraction,
   type ChatInputCommandInteraction,
   type RepliableInteraction,
   type StringSelectMenuInteraction,
 } from './components/interaction';
-export { makeSelectMenuRow, routeSelectMenuInteraction } from './components/selectMenus';
+export { makeSelectMenuRow, routeSelectMenuInteraction, type SelectMenuInfoArg } from './components/selectMenus';
 export { setComponentsState } from './components/state';
 export { collectSlashCommandsData, routeSlashCommandInteraction } from './components/slashCommands';
 export type {
