@@ -111,12 +111,20 @@ describe('generateDeployWorkflow', () => {
     const content = generateDeployWorkflow('my-bot', [], true);
     expect(content).toContain('- name: Migrate');
     expect(content).toContain('cd "${{ secrets.DEPLOY_PATH }}"');
-    expect(content).toContain('bun migrate.js');
+    expect(content).toContain('mise exec -- bun migrate.js');
     const uploadIndex = content.indexOf('- name: Upload build artifacts');
     const migrateIndex = content.indexOf('- name: Migrate');
     const deployServiceIndex = content.indexOf('- name: Deploy service');
     expect(uploadIndex).toBeLessThan(migrateIndex);
     expect(migrateIndex).toBeLessThan(deployServiceIndex);
+  });
+
+  test('Migrateはデプロイ先へ移動してからmise経由でBunを実行する(非対話SSHシェルのPATHにBunが無くても動作する)', () => {
+    const content = generateDeployWorkflow('my-bot', [], true);
+    const migrate = content.slice(content.indexOf('- name: Migrate'), content.indexOf('- name: Deploy service'));
+    expect(migrate).toContain(`ssh "\${{ secrets.SSH_USER }}@\${{ secrets.SSH_HOST }}" bash -s <<'EOF'`);
+    expect(migrate).toContain('cd "${{ secrets.DEPLOY_PATH }}"\n          mise exec -- bun migrate.js');
+    expect(migrate).not.toMatch(/^\s*bun migrate\.js\s*$/m);
   });
 
   test('Buildの後・SSHセットアップの前にスラッシュコマンド登録ステップを挟む', () => {
@@ -304,7 +312,7 @@ describe('runGenerateWorkflowSsh', () => {
       await runGenerateWorkflowSsh(dir);
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).toContain('- name: Migrate');
-      expect(content).toContain('bun migrate.js');
+      expect(content).toContain('mise exec -- bun migrate.js');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

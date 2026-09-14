@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createClient } from '@libsql/client';
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { setDbState } from './state';
@@ -17,7 +18,7 @@ export function createDbClient<S extends Record<string, unknown>>(
   if (!url) mkdirSync(dirname(localDbPath.replace(/^file:/, '')), { recursive: true });
   const client = url
     ? createClient({ url, authToken: options?.authToken ?? process.env.TURSO_AUTH_TOKEN })
-    : createClient({ url: localDbPath });
+    : createClient({ url: localDbPath.startsWith('file:') ? localDbPath : pathToFileURL(localDbPath).href });
   const db = drizzle(client, { schema });
   setDbState({ db: db as unknown as LibSQLDatabase<Record<string, unknown>>, schema });
   return db;

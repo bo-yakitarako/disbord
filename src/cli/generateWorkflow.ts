@@ -107,13 +107,13 @@ export function hasAssetsDir(cwd: string): boolean {
  * 直接接続する旧方式(build直後に`bun run migrate --production`)だと、ローカルsqlite(`prd.db`)を
  * デプロイ先ホストで使うケースに対応できない(CIランナーからそのファイルへ直接書き込めないため)。
  * Turso利用時も含めてこのSSH経由の実行に統一し、`dist/migrate.js`（`disbord build`が生成）を
- * `WorkingDirectory`(`DEPLOY_PATH`)で直接実行する。
+ * `WorkingDirectory`(`DEPLOY_PATH`)でmise経由で実行し、非対話SSHシェルでもBunを解決する。
  */
 function buildMigrateScript(): string {
   return `ssh ${SSH_TARGET} bash -s <<'EOF'
 set -e
 cd "\${{ secrets.DEPLOY_PATH }}"
-bun migrate.js
+mise exec -- bun migrate.js
 EOF`;
 }
 

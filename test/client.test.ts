@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sql } from 'drizzle-orm';
 import { createDbClient } from '../src/db/client';
 import { getDbState } from '../src/db/state';
 
@@ -38,13 +39,17 @@ describe('createDbClient', () => {
     }
   });
 
-  test('url未指定かつlocalDbPath指定時は、そのパスをローカルsqliteとして使う(本番ビルドのcreateDbClient呼び出しがdev.dbではなくprd.dbを指定するケース)', () => {
+  test.each(['prd.db', 'file:prd.db'])('localDbPath=%sは本番DBを作成し、実際に読み書きできる', async (localDbPath) => {
     delete process.env.TURSO_DATABASE_URL;
     const dir = mkdtempSync(join(tmpdir(), 'disbord-client-'));
     const originalCwd = process.cwd();
     process.chdir(dir);
     try {
-      createDbClient({}, { localDbPath: 'file:prd.db' });
+      const db = createDbClient({}, { localDbPath });
+      await db.run(sql`CREATE TABLE verification (value TEXT)`);
+      await db.run(sql`INSERT INTO verification VALUES ('ok')`);
+      const result = await db.all<{ value: string }>(sql`SELECT value FROM verification`);
+      expect(result[0]?.value).toBe('ok');
       expect(existsSync(join(dir, 'prd.db'))).toBe(true);
       expect(existsSync(join(dir, '.disbord/db/dev.db'))).toBe(false);
     } finally {

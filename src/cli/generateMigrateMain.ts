@@ -1,6 +1,6 @@
 /**
  * `.disbord/migrate.ts`（`disbord build`が生成し`dist/migrate.js`へバンドルされる実行ファイル）のソース。
- * デプロイ先ホスト上でSSH経由で`bun migrate.js`として実行される想定(`WorkingDirectory`基準で
+ * デプロイ先ホスト上でSSH経由で`mise exec -- bun migrate.js`として実行される想定(`WorkingDirectory`基準で
  * `migrations/`を読む)で、`disbord migrate --production`（Turso必須のままthrowする汎用CLI）とは別に、
  * Turso未設定時はローカルsqlite(`prd.db`)へフォールバックする`runProductionMigration`を使う。
  */
