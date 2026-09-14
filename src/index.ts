@@ -4,6 +4,7 @@ export { coreStore } from './core/coreStore';
 export { createCoreStore, resolveInstanceKey, type CoreStore } from './core/store';
 export { db } from './db/db';
 export { createDbClient } from './db/client';
+export { PRODUCTION_LOCAL_DB_PATH, runProductionMigration } from './db/migrationRunner';
 export { Model, type BaseProps } from './db/Model';
 export { buildSchema, buildTable, type ModelClass } from './db/buildSchema';
 export {

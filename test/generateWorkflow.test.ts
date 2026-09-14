@@ -104,21 +104,22 @@ describe('generateDeployWorkflow', () => {
   test('dbEnabled: falseならMigrateステップを含まない', () => {
     const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).not.toContain('- name: Migrate');
-    expect(content).not.toContain('bun run migrate --production');
+    expect(content).not.toContain('bun migrate.js');
   });
 
-  test('dbEnabled: trueならBuildの直後にMigrateステップを挟む', () => {
+  test('dbEnabled: trueならUpload build artifactsの後・Deploy serviceの前にSSH経由のMigrateステップを挟む(ローカルsqlite利用時にデプロイ先ホスト上のファイルへ直接migrateする必要があるため、CIランナー上ではなくSSH経由で実行する)', () => {
     const content = generateDeployWorkflow('my-bot', [], true);
     expect(content).toContain('- name: Migrate');
-    expect(content).toContain('run: bun run migrate --production');
-    const buildIndex = content.indexOf('- name: Build');
+    expect(content).toContain('cd "${{ secrets.DEPLOY_PATH }}"');
+    expect(content).toContain('bun migrate.js');
+    const uploadIndex = content.indexOf('- name: Upload build artifacts');
     const migrateIndex = content.indexOf('- name: Migrate');
-    const sshIndex = content.indexOf('- name: Setup SSH agent');
-    expect(buildIndex).toBeLessThan(migrateIndex);
-    expect(migrateIndex).toBeLessThan(sshIndex);
+    const deployServiceIndex = content.indexOf('- name: Deploy service');
+    expect(uploadIndex).toBeLessThan(migrateIndex);
+    expect(migrateIndex).toBeLessThan(deployServiceIndex);
   });
 
-  test('Build(Migrate)の後・SSHセットアップの前にスラッシュコマンド登録ステップを挟む', () => {
+  test('Buildの後・SSHセットアップの前にスラッシュコマンド登録ステップを挟む', () => {
     const content = generateDeployWorkflow('my-bot', [], false);
     expect(content).toContain('- name: Register slash commands');
     expect(content).toContain('run: bun run commands --production');
@@ -129,11 +130,11 @@ describe('generateDeployWorkflow', () => {
     expect(commandsIndex).toBeLessThan(sshIndex);
   });
 
-  test('dbEnabled: trueの場合、スラッシュコマンド登録ステップはMigrateの後になる', () => {
+  test('dbEnabled: trueの場合、スラッシュコマンド登録ステップはMigrateより前になる(slash command登録はCIランナー上でDiscord REST APIを直接叩くだけで、デプロイ先ホストの状態に依存しないため)', () => {
     const content = generateDeployWorkflow('my-bot', [], true);
     const migrateIndex = content.indexOf('- name: Migrate');
     const commandsIndex = content.indexOf('- name: Register slash commands');
-    expect(migrateIndex).toBeLessThan(commandsIndex);
+    expect(commandsIndex).toBeLessThan(migrateIndex);
   });
 
   test('systemdサービスの有無でrestart/新規作成+startを分岐する', () => {
@@ -207,12 +208,13 @@ describe('generateDeployWorkflow', () => {
   });
 
   test('有効なYAMLとしてパースでき、ヒアドキュメントの終端行(EOF/UNIT)がYAML側のインデント除去後に行頭へ揃う', () => {
-    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }], false);
+    const content = generateDeployWorkflow('my-bot', [{ name: 'notice', cron: '0 9 * * *' }], true);
 
     type Step = { name: string; run?: string };
     const parsed = Bun.YAML.parse(content) as { jobs: { deploy: { steps: Step[] } } };
     const steps = parsed.jobs.deploy.steps;
     expect(steps.map((s) => s.name)).toContain('Deploy service');
+    expect(steps.map((s) => s.name)).toContain('Migrate');
 
     const deployService = steps.find((s) => s.name === 'Deploy service');
     // bashのヒアドキュメント終端行は行頭(先頭スペース無し)でなければ認識されない。
@@ -221,6 +223,10 @@ describe('generateDeployWorkflow', () => {
     expect(deployService?.run).toContain('\nUNIT\n');
     expect(deployService?.run).not.toMatch(/\n +EOF/);
     expect(deployService?.run).not.toMatch(/\n +UNIT/);
+
+    const migrate = steps.find((s) => s.name === 'Migrate');
+    expect(migrate?.run).toContain('\nEOF\n');
+    expect(migrate?.run).not.toMatch(/\n +EOF/);
 
     const deployTimers = steps.find((s) => s.name === 'Deploy once timers');
     expect(deployTimers?.run).not.toMatch(/\n +EOF/);
@@ -298,7 +304,7 @@ describe('runGenerateWorkflowSsh', () => {
       await runGenerateWorkflowSsh(dir);
       const content = await readFile(join(dir, '.github/workflows/deploy.yaml'), 'utf-8');
       expect(content).toContain('- name: Migrate');
-      expect(content).toContain('run: bun run migrate --production');
+      expect(content).toContain('bun migrate.js');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

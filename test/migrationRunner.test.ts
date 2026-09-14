@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createClient } from '@libsql/client';
-import { applyPendingMigrations, STATEMENT_BREAKPOINT } from '../src/db/migrationRunner';
+import type { Config } from '../src/config';
+import { applyPendingMigrations, runProductionMigration, STATEMENT_BREAKPOINT } from '../src/db/migrationRunner';
 
 let dir: string;
 
@@ -82,5 +83,60 @@ describe('applyPendingMigrations', () => {
     // 失敗したmigrationファイルは適用済み扱いにならず、次回も同じファイルを再試行できる
     const trackingRows = await client.execute('SELECT filename FROM __disbord_migrations');
     expect(trackingRows.rows).toEqual([]);
+  });
+});
+
+describe('runProductionMigration', () => {
+  const BASE_CONFIG: Config = { intents: [], botErrorMessage: '' };
+  const originalUrl = process.env.TURSO_DATABASE_URL;
+  const originalToken = process.env.TURSO_AUTH_TOKEN;
+  let originalCwd: string;
+
+  beforeEach(() => {
+    originalCwd = process.cwd();
+    process.chdir(dir);
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    if (originalUrl === undefined) delete process.env.TURSO_DATABASE_URL;
+    else process.env.TURSO_DATABASE_URL = originalUrl;
+    if (originalToken === undefined) delete process.env.TURSO_AUTH_TOKEN;
+    else process.env.TURSO_AUTH_TOKEN = originalToken;
+  });
+
+  test('Turso未設定(config/環境変数どちらにも無い)場合は、CLIのdisbord migrate --productionと違いthrowせずカレントディレクトリのprd.dbへフォールバックする', async () => {
+    delete process.env.TURSO_DATABASE_URL;
+    delete process.env.TURSO_AUTH_TOKEN;
+    writeFileSync(join(dir, '20260101000000.sql'), 'CREATE TABLE users (id text PRIMARY KEY);');
+
+    const applied = await runProductionMigration(BASE_CONFIG, dir);
+
+    expect(applied).toEqual(['20260101000000.sql']);
+    expect(existsSync(join(dir, 'prd.db'))).toBe(true);
+  });
+
+  test('既にprd.dbが存在する場合は新規作成せず、未適用分のmigrationだけ差分適用する', async () => {
+    delete process.env.TURSO_DATABASE_URL;
+    writeFileSync(join(dir, '20260101000000.sql'), 'CREATE TABLE users (id text PRIMARY KEY);');
+    await runProductionMigration(BASE_CONFIG, dir);
+
+    writeFileSync(join(dir, '20260102000000.sql'), 'CREATE TABLE jobs (id text PRIMARY KEY);');
+    const applied = await runProductionMigration(BASE_CONFIG, dir);
+
+    expect(applied).toEqual(['20260102000000.sql']);
+    const client = createClient({ url: 'file:prd.db' });
+    const tables = await client.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    expect(tables.rows.map((r) => r.name)).toEqual(['__disbord_migrations', 'jobs', 'users']);
+  });
+
+  test('TURSO_DATABASE_URLが設定されている場合はローカルsqliteへフォールバックせずそちらを使う', async () => {
+    process.env.TURSO_DATABASE_URL = ':memory:';
+    writeFileSync(join(dir, '20260101000000.sql'), 'CREATE TABLE users (id text PRIMARY KEY);');
+
+    const applied = await runProductionMigration(BASE_CONFIG, dir);
+
+    expect(applied).toEqual(['20260101000000.sql']);
+    expect(existsSync(join(dir, 'prd.db'))).toBe(false);
   });
 });

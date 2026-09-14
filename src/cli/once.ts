@@ -52,7 +52,7 @@ export async function runOnce(name: string, production: boolean, cwd: string): P
   const mainPath = join(cwd, `.disbord/once/${name}.ts`);
   writeFileSync(
     mainPath,
-    generateOnceMainSource(name, { origin: 'once', dbEnabled, coreClassName, hasButtons, hasSelectMenus }),
+    generateOnceMainSource(name, { origin: 'once', dbEnabled, coreClassName, hasButtons, hasSelectMenus, production }),
   );
 
   const envTarget: EnvTarget = production ? 'production' : 'development';

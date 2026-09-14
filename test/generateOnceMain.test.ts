@@ -66,6 +66,23 @@ describe('generateOnceMainSource', () => {
     expect(source.indexOf('createDbClient(schema,')).toBeLessThan(source.indexOf('new Client('));
   });
 
+  test('origin: "build"はcreateDbClient呼び出しにlocalDbPath: "prd.db"を含む(systemd timer経由でデプロイ先ホスト上で実行されるため)', () => {
+    const source = generateOnceMainSource('notice', { dbEnabled: true, origin: 'build' });
+    expect(source).toContain(
+      "createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken, localDbPath: 'prd.db' });",
+    );
+  });
+
+  test('origin: "once"でもproduction: trueならlocalDbPath: "prd.db"を含む(disbord once <name> --productionをデプロイ先ホストで直接実行するケース)', () => {
+    const source = generateOnceMainSource('notice', { dbEnabled: true, origin: 'once', production: true });
+    expect(source).toContain("localDbPath: 'prd.db'");
+  });
+
+  test('origin: "once"かつproduction未指定(デフォルトfalse)はlocalDbPathを指定しない', () => {
+    const source = generateOnceMainSource('notice', { dbEnabled: true, origin: 'once' });
+    expect(source).not.toContain('localDbPath');
+  });
+
   test('coreClassName未指定時はCoreクラスのimport・createCoreStore呼び出しを一切含まない', () => {
     const source = generateOnceMainSource('notice');
     expect(source).not.toContain('createCoreStore');

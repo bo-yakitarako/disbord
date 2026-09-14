@@ -146,9 +146,10 @@ export function generateMainSource(eventNames: string[], options: GenerateMainSo
   const buttonsImport = optionalLine(hasButtons, `\nimport buttons from '../src/components/buttons';`);
   const selectMenusImport = optionalLine(hasSelectMenus, `\nimport selectMenus from '../src/components/selectMenus';`);
   const schemaImport = optionalLine(dbEnabled, `\nimport { schema } from '../src/db/schema';`);
+  const localDbPathOption = origin === 'build' ? `, localDbPath: 'prd.db'` : '';
   const dbInit = optionalLine(
     dbEnabled,
-    `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken });\n\n`,
+    `  createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken${localDbPathOption} });\n\n`,
   );
   const coreClassImport = optionalLine(
     Boolean(coreClassName),

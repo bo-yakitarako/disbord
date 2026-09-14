@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildDistMiseToml, BUILD_BUNDLE_BANNER, parseBuildArgs, stripDotenvxEnvHeader } from '../src/cli/build';
+import {
+  buildDistMiseToml,
+  BUILD_BUNDLE_BANNER,
+  copyMigrationsToDist,
+  parseBuildArgs,
+  stripDotenvxEnvHeader,
+} from '../src/cli/build';
 
 describe('parseBuildArgs', () => {
   test('引数なし時はexternalが空配列', () => {
@@ -66,6 +73,49 @@ describe('buildDistMiseToml', () => {
     expect(buildDistMiseToml(BASE_MISE_TOML, ['notice', 'cleanup'])).toBe(
       `[tools]\nbun = "1.3.13"\n\n[tasks.main]\nrun = 'bun main.js'\n\n[tasks.notice]\nrun = 'bun notice.js'\n\n[tasks.cleanup]\nrun = 'bun cleanup.js'\n`,
     );
+  });
+});
+
+describe('copyMigrationsToDist', () => {
+  test('migrations/*.sqlをdist/migrations/へコピーする(dist/migrate.jsがWorkingDirectory基準でmigrations/を読むため、既存のrsync -avz dist/にそのまま乗せる)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-copy-migrations-'));
+    try {
+      await mkdir(join(dir, 'migrations'), { recursive: true });
+      await writeFile(join(dir, 'migrations/20260101000000.sql'), 'CREATE TABLE users (id text PRIMARY KEY);');
+      await writeFile(join(dir, 'migrations/_snapshot.json'), '{}');
+
+      copyMigrationsToDist(dir);
+
+      const copied = await readFile(join(dir, 'dist/migrations/20260101000000.sql'), 'utf-8');
+      expect(copied).toBe('CREATE TABLE users (id text PRIMARY KEY);');
+      expect(existsSync(join(dir, 'dist/migrations/_snapshot.json'))).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('migrations/ディレクトリが存在しない場合は何もしない(dbEnabledだがまだmodelが無いプロジェクトのbuildが失敗しないように)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-copy-migrations-'));
+    try {
+      copyMigrationsToDist(dir);
+      expect(existsSync(join(dir, 'dist/migrations'))).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('.sqlファイルが1件も無い場合はdist/migrations/自体を作らない', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'disbord-copy-migrations-'));
+    try {
+      await mkdir(join(dir, 'migrations'), { recursive: true });
+      await writeFile(join(dir, 'migrations/_snapshot.json'), '{}');
+
+      copyMigrationsToDist(dir);
+
+      expect(existsSync(join(dir, 'dist/migrations'))).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

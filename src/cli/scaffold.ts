@@ -494,13 +494,13 @@ export namespace Job {
 }
 \`\`\`
 
-\`id\` / \`createdAt\` / \`updatedAt\`は全モデル共通で自動付与されます。\`Model<Job.Data>\`が要求する\`namespace Job { export type Data = ... }\`ブロックは手書き不要で、\`disbord generate model\` / \`disbord migrate\` / \`disbord model type\`実行のたびに\`@Column\`/\`@Relate\`のメタデータから機械的に導出してファイル末尾へ自動生成されます（\`Job.create()\`/\`find()\`/\`update()\`等の入力型はこの\`Job.Data\`を経由するため、キー名のtypoやカラム追加漏れがコンパイルエラーで検知できます）。接続先はTurso用の環境変数の有無で自動判定され（未設定ならローカルsqlite\`.disbord/db/dev.db\`）、中身は\`disbord studio\`で確認できます。
+\`id\` / \`createdAt\` / \`updatedAt\`は全モデル共通で自動付与されます。\`Model<Job.Data>\`が要求する\`namespace Job { export type Data = ... }\`ブロックは手書き不要で、\`disbord generate model\` / \`disbord migrate\` / \`disbord model type\`実行のたびに\`@Column\`/\`@Relate\`のメタデータから機械的に導出してファイル末尾へ自動生成されます（\`Job.create()\`/\`find()\`/\`update()\`等の入力型はこの\`Job.Data\`を経由するため、キー名のtypoやカラム追加漏れがコンパイルエラーで検知できます）。接続先はTurso用の環境変数の有無で自動判定され（未設定なら開発時はローカルsqlite\`.disbord/db/dev.db\`）、中身は\`disbord studio\`で確認できます。本番も同様にTurso未設定ならローカルsqliteにフォールバックしますが、この場合はデプロイ先ホスト上の\`prd.db\`が使われ、\`disbord generate workflow ssh\`が生成する\`deploy.yaml\`のMigrateステップでSSH経由（デプロイ先ホスト上で\`dist/migrate.js\`を実行）で生成・migrationされます。
 
 \`@Column\`の\`default\`オプションは値の種類でDB側/JS側どちらのdefaultになるか変わります。固定値（例: \`default: 'pending'\`）はDBスキーマの\`DEFAULT\`句として、関数（例: \`default: () => crypto.randomUUID()\`）はdrizzle-orm（JS側）がINSERT時に評価する値として扱われます（生SQLでのINSERTには効きません）。\`type\`/\`mode\`ごとに\`default\`の型も絞られており（例: \`mode: 'boolean'\`なら\`boolean\`のみ）、\`mode: 'timestamp_ms'\`のカラムは\`Date\`ではなく\`Dayjs\`（固定値・\`() => Dayjs\`関数どちらも）で指定します（DBへ渡す際は内部でDateへ変換されます）。さらに\`mode: 'timestamp_ms'\`のカラムに限り特別な値\`default: 'now'\`も使え、DB側の\`DEFAULT (unixepoch('subsec') * 1000)\`（挿入時刻のミリ秒unix時間）になります。\`default\`が指定されたカラムは自動生成される\`Job.Data\`側でも\`?\`付きのoptionalになるため、\`Job.create()\`呼び出し時にその値の指定を省略できます（省略した場合はDB/drizzle側のdefaultがそのまま使われます）。
 
 ## デプロイ（\`.github/workflows/\`）
 
-\`disbord generate workflow ssh\`で\`.github/workflows/deploy.yaml\`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（\`--user\`）のサービスとして起動・再起動します。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、\`disbord.config.ts\`の\`timer\`で指定したスケジュールで定期実行します（\`timer\`未設定のonceスクリプトには、このコマンド実行時にデフォルト値が自動で補完されます）。\`lefthook.yml\`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
+\`disbord generate workflow ssh\`で\`.github/workflows/deploy.yaml\`を生成します。pushをトリガーにビルド後、SSH経由でリモートホストへ配置し、systemd（\`--user\`）のサービスとして起動・再起動します。db有効時はビルド成果物のアップロード後・サービス再起動前にSSH経由で\`dist/migrate.js\`を実行してmigrationを適用します（Turso利用時もローカルsqlite(\`prd.db\`)利用時もこのSSH経由の実行に統一されており、後者の場合はこのタイミングでデプロイ先ホスト上に\`prd.db\`が生成されます）。onceスクリプトがある場合はそれぞれtimerユニットも合わせてデプロイし、\`disbord.config.ts\`の\`timer\`で指定したスケジュールで定期実行します（\`timer\`未設定のonceスクリプトには、このコマンド実行時にデフォルト値が自動で補完されます）。\`lefthook.yml\`があればpre-commitにも再生成コマンドが追加され、config変更などがdeploy.yamlへ自動で反映されます。
 
 ## エラーハンドリング
 

@@ -1,8 +1,16 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Client } from '@libsql/client';
+import { createClient, type Client } from '@libsql/client';
+import type { Config } from '../config';
 
 const TRACKING_TABLE = '__disbord_migrations';
+
+/**
+ * デプロイ先ホスト上でTursoが未設定の場合に本番DBとして使うローカルsqliteファイル。
+ * `disbord build`が生成する`dist/migrate.js`（SSH経由でデプロイ先ホスト上で実行される）
+ * 専用のフォールバック先で、CLIの`disbord migrate --production`（Turso必須のまま）とは別物。
+ */
+export const PRODUCTION_LOCAL_DB_PATH = 'file:prd.db';
 
 /**
  * migrationファイルは複数のstatementをこの区切り文字列で結合して書き出される。
@@ -52,4 +60,18 @@ export async function applyPendingMigrations(client: Client, migrationsDir: stri
     appliedNow.push(file);
   }
   return appliedNow;
+}
+
+/**
+ * `dist/migrate.js`（`disbord build`が生成し、SSH経由でデプロイ先ホスト上で実行される想定）専用の
+ * migration実行ロジック。`config.db.tursoDatabaseUrl`/`TURSO_DATABASE_URL`が無い場合、CLIの
+ * `disbord migrate --production`と違いthrowせず、デプロイ先ホスト上のローカルsqlite
+ * (`PRODUCTION_LOCAL_DB_PATH`)へフォールバックする（既にファイルがあれば差分migrationの適用のみ）。
+ */
+export async function runProductionMigration(config: Config, migrationsDir: string): Promise<string[]> {
+  const url = config.db?.tursoDatabaseUrl ?? process.env.TURSO_DATABASE_URL ?? PRODUCTION_LOCAL_DB_PATH;
+  const authToken =
+    url === PRODUCTION_LOCAL_DB_PATH ? undefined : (config.db?.tursoAuthToken ?? process.env.TURSO_AUTH_TOKEN);
+  const client = createClient({ url, authToken });
+  return applyPendingMigrations(client, migrationsDir);
 }

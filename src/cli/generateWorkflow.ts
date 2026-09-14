@@ -103,6 +103,21 @@ export function hasAssetsDir(cwd: string): boolean {
 }
 
 /**
+ * デプロイ先ホスト上でSSH経由で本番migrationを実行するスクリプト。CIランナーからTursoへ
+ * 直接接続する旧方式(build直後に`bun run migrate --production`)だと、ローカルsqlite(`prd.db`)を
+ * デプロイ先ホストで使うケースに対応できない(CIランナーからそのファイルへ直接書き込めないため)。
+ * Turso利用時も含めてこのSSH経由の実行に統一し、`dist/migrate.js`（`disbord build`が生成）を
+ * `WorkingDirectory`(`DEPLOY_PATH`)で直接実行する。
+ */
+function buildMigrateScript(): string {
+  return `ssh ${SSH_TARGET} bash -s <<'EOF'
+set -e
+cd "\${{ secrets.DEPLOY_PATH }}"
+bun migrate.js
+EOF`;
+}
+
+/**
  * メインサービスのデプロイスクリプト。`~/.config/systemd/user/{name}.service`の有無で
  * restart(既存デプロイ)か新規作成+startかを分岐する。新規作成時は`start`でその場で起動した後、
  * `enable`でホスト再起動後も自動起動するようにする(起動有無と自動起動有効化は別概念のため、
@@ -187,12 +202,6 @@ export function generateDeployWorkflow(
         run: echo "\${{ secrets.ENV_KEYS }}" > env/.env.keys.production`,
     `      - name: Build
         run: bun run build`,
-    ...(dbEnabled
-      ? [
-          `      - name: Migrate
-        run: bun run migrate --production`,
-        ]
-      : []),
     `      - name: Register slash commands
         run: bun run commands --production`,
     `      - name: Setup SSH agent
@@ -205,6 +214,7 @@ export function generateDeployWorkflow(
 ssh-keyscan -H "\${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts`,
     ),
     buildStep('Upload build artifacts', buildUploadArtifactsScript(assetsEnabled)),
+    ...(dbEnabled ? [buildStep('Migrate', buildMigrateScript())] : []),
     buildStep('Deploy service', buildMainServiceScript(botName)),
     ...(onceEntries.length > 0 ? [buildStep('Deploy once timers', buildOnceTimersScript(botName, onceEntries))] : []),
   ];

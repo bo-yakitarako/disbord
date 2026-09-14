@@ -1,8 +1,9 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnDotenvxCapture } from './dotenvxSpawn';
 import { regenerateDisbordDtsFromConfig } from './dtsRegen';
 import { generateMainSource, scanComponentFiles, scanEventFiles } from './generate';
+import { generateMigrateMainSource } from './generateMigrateMain';
 import { generateOnceMainSource, scanOnceFiles } from './generateOnceMain';
 import { readBotConfig } from './readBotConfig';
 import { regenerateSchemaFile } from './schemaGen';
@@ -102,6 +103,50 @@ async function buildOnceScripts(
 }
 
 /**
+ * `.disbord/migrate.ts`（デプロイ先ホスト上でSSH経由で実行する本番migrationスクリプト）を生成し
+ * `dist/migrate.js`へbundleする。dbEnabled時のみ`runBuild`から呼ばれる。
+ */
+async function buildMigrateScript(cwd: string, external: string[]): Promise<void> {
+  const mainPath = join(cwd, '.disbord/migrate.ts');
+  writeFileSync(mainPath, generateMigrateMainSource());
+
+  const result = await Bun.build({
+    entrypoints: [mainPath],
+    outdir: join(cwd, 'dist'),
+    target: 'bun',
+    minify: true,
+    external,
+    banner: BUILD_BUNDLE_BANNER,
+  });
+  if (!result.success) {
+    for (const log of result.logs) {
+      console.error(log);
+    }
+    throw new Error('disbord: bun build（migrate）に失敗しました');
+  }
+}
+
+/**
+ * `migrations/*.sql`を`dist/migrations/`へコピーする。`dist/migrate.js`は`WorkingDirectory`(デプロイ先の
+ * `DEPLOY_PATH`)直下の`migrations/`を読むため、既存の`rsync -avz dist/ ...`にそのまま乗せて配布する。
+ * `_snapshot.json`はdev migrate専用の内部管理ファイルなのでコピー対象外(本番migrateは既存の
+ * `migrations/*.sql`を順に適用するだけで、スキーマ差分の再計算はしないため不要)。
+ */
+export function copyMigrationsToDist(cwd: string): void {
+  const migrationsDir = join(cwd, 'migrations');
+  if (!existsSync(migrationsDir)) return;
+
+  const sqlFiles = readdirSync(migrationsDir).filter((name) => name.endsWith('.sql'));
+  if (sqlFiles.length === 0) return;
+
+  const distMigrationsDir = join(cwd, 'dist/migrations');
+  mkdirSync(distMigrationsDir, { recursive: true });
+  for (const file of sqlFiles) {
+    writeFileSync(join(distMigrationsDir, file), readFileSync(join(migrationsDir, file)));
+  }
+}
+
+/**
  * `.disbord/main.ts`を生成し`dist/main.js`へbundleする。runBuild本体の複雑度
  * (oxlint complexity)を抑えるため、buildOnceScriptsと同様に分離している。
  */
@@ -181,6 +226,11 @@ export async function runBuild(cwd: string, options: { external?: string[] } = {
     hasSelectMenus,
     external: [...external],
   });
+
+  if (dbEnabled) {
+    await buildMigrateScript(cwd, [...external]);
+    copyMigrationsToDist(cwd);
+  }
 
   const baseMiseToml = readFileSync(join(cwd, 'mise.toml'), 'utf-8');
   writeFileSync(join(cwd, 'dist/mise.toml'), buildDistMiseToml(baseMiseToml, onceNames));

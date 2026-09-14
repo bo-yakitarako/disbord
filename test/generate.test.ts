@@ -240,6 +240,18 @@ describe('generateMainSource', () => {
     expect(source.indexOf('createDbClient(schema,')).toBeLessThan(source.indexOf('new Client('));
   });
 
+  test('origin: "build"はcreateDbClient呼び出しにlocalDbPath: "prd.db"を含む(デプロイ先ホスト上でTurso未設定時にdev.dbではなくprd.dbへフォールバックさせるため)', () => {
+    const source = generateMainSource([], { dbEnabled: true, origin: 'build' });
+    expect(source).toContain(
+      "createDbClient(schema, { url: config.db?.tursoDatabaseUrl, authToken: config.db?.tursoAuthToken, localDbPath: 'prd.db' });",
+    );
+  });
+
+  test('origin: "dev"(デフォルト)はlocalDbPathを指定しない', () => {
+    const source = generateMainSource([], { dbEnabled: true, origin: 'dev' });
+    expect(source).not.toContain('localDbPath');
+  });
+
   test('dbEnabled: falseはschema importを含まない', () => {
     const source = generateMainSource([], { dbEnabled: false });
     expect(source).not.toContain('db/schema');

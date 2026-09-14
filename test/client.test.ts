@@ -37,4 +37,19 @@ describe('createDbClient', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('url未指定かつlocalDbPath指定時は、そのパスをローカルsqliteとして使う(本番ビルドのcreateDbClient呼び出しがdev.dbではなくprd.dbを指定するケース)', () => {
+    delete process.env.TURSO_DATABASE_URL;
+    const dir = mkdtempSync(join(tmpdir(), 'disbord-client-'));
+    const originalCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      createDbClient({}, { localDbPath: 'file:prd.db' });
+      expect(existsSync(join(dir, 'prd.db'))).toBe(true);
+      expect(existsSync(join(dir, '.disbord/db/dev.db'))).toBe(false);
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
